@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KitCalc - Advanced Spreadsheet Suite</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        excel: { 50: '#f0fdf4', 100: '#dcfce7', 600: '#16a34a', 700: '#15803d', 800: '#166534' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Custom styles for spreadsheet grid and selection */
+        .cell {
+            user-select: none;
+            -webkit-user-select: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .cell-selected {
+            outline: 2px solid #16a34a;
+            outline-offset: -1px;
+            background-color: rgba(22, 163, 74, 0.08);
+        }
+        .cell-highlight {
+            background-color: rgba(22, 163, 74, 0.04);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .dark ::-webkit-scrollbar-track { background: #1e293b; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 font-sans overflow-hidden select-none">
+
+    <!-- Top Application Header -->
+    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between shadow-sm z-30">
+        <div class="flex items-center space-x-3">
+            <div class="bg-excel-600 text-white p-2 rounded-lg shadow flex items-center justify-center font-bold text-xl w-10 h-10">
+                <i class="fa-solid fa-table"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="workbook-title" value="Libro sin título - KitCalc" class="font-semibold text-lg bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-excel-600 focus:outline-none px-1 rounded transition">
+                    <span class="text-xs bg-excel-100 text-excel-800 dark:bg-emerald-900/50 dark:text-emerald-300 px-2 py-0.5 rounded-full font-medium" data-i18n="saved">Guardado</span>
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 flex items-center space-x-3">
+                    <span id="current-sheet-name-label">Hoja1</span>
+                    <span>•</span>
+                    <span id="cell-count-status">260 celdas</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Header Actions & Language Selector -->
+        <div class="flex items-center space-x-3">
+            <!-- Language Dropdown -->
+            <div class="relative">
+                <select id="language-select" class="bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-excel-600 font-medium">
+                    <option value="es">🇪🇸 Español</option>
+                    <option value="en">🇺🇸 English</option>
+                    <option value="pt">🇧🇷 Português</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="it">🇮🇹 Italiano</option>
+                    <option value="ja">🇯🇵 日本語</option>
+                    <option value="ko">🇰🇷 한국어</option>
+                    <option value="ru">🇷🇺 Русский</option>
+                    <option value="zh">🇨🇳 中文</option>
+                </select>
+            </div>
+
+            <!-- Dark/Light Mode Toggle -->
+            <button id="theme-toggle" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Cambiar Tema">
+                <i class="fa-solid fa-moon dark:hidden"></i>
+                <i class="fa-solid fa-sun hidden dark:block"></i>
+            </button>
+
+            <!-- Help Modal Trigger -->
+            <button onclick="openModal('help-modal')" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Ayuda y Fórmulas">
+                <i class="fa-solid fa-circle-question"></i>
+            </button>
+
+            <!-- Export / Import Dropdown -->
+            <div class="relative group">
+                <button class="bg-excel-600 hover:bg-excel-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center space-x-2 shadow-sm transition">
+                    <i class="fa-solid fa-file-arrow-down"></i>
+                    <span data-i18n="export">Exportar / Plantillas</span>
+                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                </button>
+                <div class="absolute right-0 mt-1 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl hidden group-hover:block z-50 py-1 text-sm">
+                    <button onclick="exportCSV()" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2"><i class="fa-solid fa-file-csv text-green-600"></i><span data-i18n="export_csv">Exportar a CSV</span></button>
+                    <button onclick="exportJSON()" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2"><i class="fa-solid fa-file-code text-blue-600"></i><span data-i18n="export_json">Exportar Backup JSON</span></button>
+                    <button onclick="triggerImport()" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2"><i class="fa-solid fa-file-arrow-up text-amber-600"></i><span data-i18n="import_json">Importar Archivo</span></button>
+                    <div class="border-t border-slate-200 dark:border-slate-700 my-1"></div>
+                    <button onclick="loadTemplate('budget')" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2"><i class="fa-solid fa-wallet text-purple-600"></i><span data-i18n="tpl_budget">Plantilla: Presupuesto</span></button>
+                    <button onclick="loadTemplate('invoice')" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2"><i class="fa-solid fa-file-invoice-dollar text-emerald-600"></i><span data-i18n="tpl_invoice">Plantilla: Factura</span></button>
+                    <button onclick="loadTemplate('grades')" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2"><i class="fa-solid fa-graduation-cap text-indigo-600"></i><span data-i18n="tpl_grades">Plantilla: Calificaciones</span></button>
+                    <button onclick="loadTemplate('workout')" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2"><i class="fa-solid fa-dumbbell text-rose-600"></i><span data-i18n="tpl_workout">Plantilla: Rutina Gym</span></button>
+                </div>
+            </div>
+            <input type="file" id="import-file-input" class="hidden" accept=".json,.csv" onchange="handleFileImport(event)">
+        </div>
+    </header>
+
+    <!-- Ribbon / Toolbar -->
+    <div class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-2 py-1.5 flex flex-wrap items-center gap-1 shadow-sm z-20 text-sm">
+        <!-- Undo / Redo -->
+        <div class="flex items-center space-x-0.5 border-r border-slate-200 dark:border-slate-700 pr-2">
+            <button onclick="undo()" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition text-slate-700 dark:text-slate-300" title="Deshacer (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+            <button onclick="redo()" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition text-slate-700 dark:text-slate-300" title="Rehacer (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
+
+        <!-- Font Family & Size -->
+        <div class="flex items-center space-x-1 border-r border-slate-200 dark:border-slate-700 pr-2">
+            <select id="font-family-select" onchange="formatSelectedCells('fontFamily', this.value)" class="bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-xs">
+                <option value="sans-serif">Sans Serif</option>
+                <option value="serif">Serif</option>
+                <option value="monospace">Monospace</option>
+                <option value="Arial">Arial</option>
+                <option value="Courier New">Courier New</option>
+            </select>
+            <select id="font-size-select" onchange="formatSelectedCells('fontSize', this.value)" class="bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-xs">
+                <option value="10px">10px</option>
+                <option value="12px" selected>12px</option>
+                <option value="14px">14px</option>
+                <option value="16px">16px</option>
+                <option value="18px">18px</option>
+                <option value="20px">20px</option>
+            </select>
+        </div>
+
+        <!-- Text Styling: Bold, Italic, Underline, Strikethrough -->
+        <div class="flex items-center space-x-0.5 border-r border-slate-200 dark:border-slate-700 pr-2">
+            <button onclick="formatSelectedCells('bold')" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded font-bold w-7 h-7 flex items-center justify-center transition" title="Negrita">B</button>
+            <button onclick="formatSelectedCells('italic')" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded italic w-7 h-7 flex items-center justify-center transition" title="Cursiva">I</button>
+            <button onclick="formatSelectedCells('underline')" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded underline w-7 h-7 flex items-center justify-center transition" title="Subrayado">U</button>
+        </div>
+
+        <!-- Colors: Text & Fill -->
+        <div class="flex items-center space-x-2 border-r border-slate-200 dark:border-slate-700 pr-2">
+            <div class="flex items-center space-x-1" title="Color de Texto">
+                <i class="fa-solid fa-font text-xs text-slate-500"></i>
+                <input type="color" id="text-color-input" value="#000000" onchange="formatSelectedCells('textColor', this.value)" class="w-6 h-6 border-0 rounded cursor-pointer bg-transparent">
+            </div>
+            <div class="flex items-center space-x-1" title="Color de Fondo">
+                <i class="fa-solid fa-fill-drip text-xs text-slate-500"></i>
+                <input type="color" id="bg-color-input" value="#ffffff" onchange="formatSelectedCells('bgColor', this.value)" class="w-6 h-6 border-0 rounded cursor-pointer bg-transparent">
+            </div>
+        </div>
+
+        <!-- Alignment -->
+        <div class="flex items-center space-x-0.5 border-r border-slate-200 dark:border-slate-700 pr-2">
+            <button onclick="formatSelectedCells('align', 'left')" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded w-7 h-7 flex items-center justify-center" title="Alinear Izquierda"><i class="fa-solid fa-align-left text-xs"></i></button>
+            <button onclick="formatSelectedCells('align', 'center')" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded w-7 h-7 flex items-center justify-center" title="Centrar"><i class="fa-solid fa-align-center text-xs"></i></button>
+            <button onclick="formatSelectedCells('align', 'right')" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded w-7 h-7 flex items-center justify-center" title="Alinear Derecha"><i class="fa-solid fa-align-right text-xs"></i></button>
+        </div>
+
+        <!-- Number Format Helpers -->
+        <div class="flex items-center space-x-1 border-r border-slate-200 dark:border-slate-700 pr-2">
+            <button onclick="formatSelectedCells('numberFormat', 'currency')" class="px-2 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-xs font-semibold" title="Moneda ($)">$</button>
+            <button onclick="formatSelectedCells('numberFormat', 'percent')" class="px-2 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-xs font-semibold" title="Porcentaje (%)">%</button>
+            <button onclick="formatSelectedCells('numberFormat', 'decimal')" class="px-2 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-xs font-semibold" title="Decimales (.00)">.00</button>
+        </div>
+
+        <!-- Advanced Tools: Sort, Filter, Chart, Find, Clear -->
+        <div class="flex items-center space-x-1">
+            <button onclick="openModal('chart-modal')" class="px-2 py-1 bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded text-xs font-medium flex items-center space-x-1 transition">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span data-i18n="chart_btn">Gráfico</span>
+            </button>
+            <button onclick="openModal('find-modal')" class="px-2 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-xs font-medium flex items-center space-x-1 transition">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span data-i18n="find_btn">Buscar</span>
+            </button>
+            <button onclick="openModal('sort-modal')" class="px-2 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-xs font-medium flex items-center space-x-1 transition">
+                <i class="fa-solid fa-arrow-down-wide-short"></i>
+                <span data-i18n="sort_btn">Ordenar</span>
+            </button>
+            <button onclick="clearSelectedCells()" class="px-2 py-1 bg-rose-50 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 rounded text-xs font-medium flex items-center space-x-1 transition">
+                <i class="fa-solid fa-eraser"></i>
+                <span data-i18n="clear_btn">Limpiar</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Formula Bar -->
+    <div class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center space-x-3 z-20">
+        <div id="selected-cell-display" class="font-mono font-bold text-sm bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded w-20 text-center border border-slate-300 dark:border-slate-600">A1</div>
+        <div class="text-slate-400 font-serif italic text-sm font-bold">fx</div>
+        <div class="relative flex-1">
+            <input type="text" id="formula-bar-input" oninput="onFormulaBarInput(event)" onkeydown="onFormulaBarKeydown(event)" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-excel-600 font-mono" placeholder="Ingresa valor o fórmula (ej. =SUMA(A1:A5))">
+            <!-- Formula Helper Autocomplete Tooltip -->
+            <div id="formula-autocomplete" class="absolute left-0 top-full mt-1 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl hidden z-50 p-2 text-xs">
+                <div class="font-bold text-slate-500 px-2 py-1 border-b border-slate-100 dark:border-slate-700" data-i18n="suggestions">Sugerencias de Fórmulas</div>
+                <div id="formula-suggestions-list" class="mt-1 space-y-0.5 max-h-48 overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Spreadsheet Grid Area -->
+    <div id="grid-container" class="flex-1 overflow-auto relative bg-white dark:bg-slate-900">
+        <table id="spreadsheet-table" class="border-collapse w-full">
+            <thead id="spreadsheet-thead"></thead>
+            <tbody id="spreadsheet-tbody"></tbody>
+        </table>
+    </div>
+
+    <!-- Bottom Status Bar & Sheet Tabs -->
+    <footer class="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 px-4 py-1.5 flex items-center justify-between text-xs z-30">
+        <!-- Sheet Tabs Manager -->
+        <div class="flex items-center space-x-1 overflow-x-auto max-w-[60%]">
+            <button onclick="addSheet()" class="p-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition text-slate-700 dark:text-slate-200 mr-2" title="Nueva Hoja">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+            <div id="sheet-tabs-container" class="flex items-center space-x-1"></div>
+        </div>
+
+        <!-- Real-time Stats for Selected Range -->
+        <div class="flex items-center space-x-6 text-slate-500 dark:text-slate-400 font-mono">
+            <div><span data-i18n="stat_sum">Suma</span>: <span id="stat-sum" class="font-semibold text-slate-700 dark:text-slate-200">0</span></div>
+            <div><span data-i18n="stat_avg">Promedio</span>: <span id="stat-avg" class="font-semibold text-slate-700 dark:text-slate-200">0</span></div>
+            <div><span data-i18n="stat_count">Recuento</span>: <span id="stat-count" class="font-semibold text-slate-700 dark:text-slate-200">0</span></div>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+
+    <!-- Chart Modal -->
+    <div id="chart-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center space-x-2"><i class="fa-solid fa-chart-pie text-excel-600"></i><span data-i18n="chart_title">Generar Gráfico Estadístico</span></h3>
+                <button onclick="closeModal('chart-modal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" data-i18n="chart_type">Tipo de Gráfico</label>
+                        <select id="chart-type-select" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm">
+                            <option value="bar">Barras</option>
+                            <option value="line">Líneas</option>
+                            <option value="pie">Circular (Pie)</option>
+                            <option value="doughnut">Dona</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1" data-i18n="chart_range">Rango de Datos (ej. A1:B10)</label>
+                        <input type="text" id="chart-range-input" value="A1:B10" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm font-mono">
+                    </div>
+                </div>
+                <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 h-72 flex items-center justify-center">
+                    <canvas id="dynamic-chart-canvas"></canvas>
+                </div>
+            </div>
+            <div class="px-6 py-3 bg-slate-50 dark:bg-slate-700/50 flex justify-end space-x-3">
+                <button onclick="closeModal('chart-modal')" class="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700" data-i18n="close">Cerrar</button>
+                <button onclick="renderChart()" class="px-4 py-2 bg-excel-600 hover:bg-excel-700 text-white rounded-lg text-sm font-medium shadow" data-i18n="generate">Generar Gráfico</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Find & Replace Modal -->
+    <div id="find-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center space-x-2"><i class="fa-solid fa-magnifying-glass text-excel-600"></i><span data-i18n="find_title">Buscar y Reemplazar</span></h3>
+                <button onclick="closeModal('find-modal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold mb-1" data-i18n="find_what">Buscar:</label>
+                    <input type="text" id="find-input" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold mb-1" data-i18n="replace_with">Reemplazar con:</label>
+                    <input type="text" id="replace-input" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm">
+                </div>
+            </div>
+            <div class="px-6 py-3 bg-slate-50 dark:bg-slate-700/50 flex justify-end space-x-3">
+                <button onclick="closeModal('find-modal')" class="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700" data-i18n="close">Cerrar</button>
+                <button onclick="executeFindReplace()" class="px-4 py-2 bg-excel-600 hover:bg-excel-700 text-white rounded-lg text-sm font-medium shadow" data-i18n="replace_all">Reemplazar Todo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sort Modal -->
+    <div id="sort-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center space-x-2"><i class="fa-solid fa-arrow-down-wide-short text-excel-600"></i><span data-i18n="sort_title">Ordenar Rango</span></h3>
+                <button onclick="closeModal('sort-modal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold mb-1" data-i18n="sort_range">Rango a ordenar (ej. A1:B10)</label>
+                    <input type="text" id="sort-range-input" value="A1:B10" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold mb-1" data-i18n="sort_order">Criterio</label>
+                    <select id="sort-order-select" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm">
+                        <option value="asc" data-i18n="sort_asc">Ascendente (A-Z)</option>
+                        <option value="desc" data-i18n="sort_desc">Descendente (Z-A)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="px-6 py-3 bg-slate-50 dark:bg-slate-700/50 flex justify-end space-x-3">
+                <button onclick="closeModal('sort-modal')" class="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700" data-i18n="close">Cerrar</button>
+                <button onclick="executeSort()" class="px-4 py-2 bg-excel-600 hover:bg-excel-700 text-white rounded-lg text-sm font-medium shadow" data-i18n="sort_execute">Ordenar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help & Formulas Modal -->
+    <div id="help-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-700 max-h-[80vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center space-x-2"><i class="fa-solid fa-circle-question text-excel-600"></i><span data-i18n="help_title">Guía de Fórmulas y Atajos KitCalc</span></h3>
+                <button onclick="closeModal('help-modal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-4 text-sm">
+                <h4 class="font-bold text-excel-600" data-i18n="help_formulas">Fórmulas Soportadas:</h4>
+                <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 font-mono text-xs">
+                    <li><b>SUMA(rango)</b> - Suma de valores (ej. =SUMA(A1:A5))</li>
+                    <li><b>PROMEDIO(rango)</b> - Media aritmética</li>
+                    <li><b>CONTAR(rango)</b> - Cuenta celdas numéricas</li>
+                    <li><b>MAX(rango) / MIN(rango)</b> - Valor máximo y mínimo</li>
+                    <li><b>SI(cond; v1; v2)</b> - Condicional lógico</li>
+                    <li><b>CONCAT(t1; t2)</b> - Unir textos</li>
+                    <li><b>PRODUCTO(rango)</b> - Multiplicación de valores</li>
+                    <li><b>REDONDEO(val; dec)</b> - Redondeo decimal</li>
+                    <li><b>RAIZ(val)</b> - Raíz cuadrada</li>
+                    <li><b>MAYUSC(texto) / MINUSC(texto)</b> - Conversión de mayúsculas/minúsculas</li>
+                    <li><b>HOY() / AHORA()</b> - Fechas actuales</li>
+                </ul>
+                <h4 class="font-bold text-excel-600 pt-2" data-i18n="help_shortcuts">Atajos de Teclado:</h4>
+                <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 text-xs">
+                    <li><b>Ctrl + Z / Ctrl + Y</b>: Deshacer / Rehacer</li>
+                    <li><b>Flechas del teclado</b>: Navegar entre celdas</li>
+                    <li><b>Enter</b>: Guardar celda y bajar</li>
+                    <li><b>Tab</b>: Guardar celda y mover a la derecha</li>
+                    <li><b>Doble Clic / F2</b>: Editar celda activa</li>
+                </ul>
+            </div>
+            <div class="px-6 py-3 bg-slate-50 dark:bg-slate-700/50 flex justify-end">
+                <button onclick="closeModal('help-modal')" class="px-4 py-2 bg-excel-600 hover:bg-excel-700 text-white rounded-lg text-sm font-medium shadow" data-i18n="close">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script Engine -->
+    <script>
+        // --- 1. Multi-Language Translations (10 Languages) ---
+        const translations = {
+            es: {
+                saved: "Guardado", export: "Exportar / Plantillas", export_csv: "Exportar a CSV", export_json: "Exportar Backup JSON",
+                import_json: "Importar Archivo", tpl_budget: "Plantilla: Presupuesto", tpl_invoice: "Plantilla: Factura",
+                tpl_grades: "Plantilla: Calificaciones", tpl_workout: "Plantilla: Rutina Gym", chart_btn: "Gráfico", find_btn: "Buscar",
+                sort_btn: "Ordenar", clear_btn: "Limpiar", stat_sum: "Suma", stat_avg: "Promedio", stat_count: "Recuento",
+                chart_title: "Generar Gráfico Estadístico", chart_type: "Tipo de Gráfico", chart_range: "Rango de Datos (ej. A1:B10)",
+                close: "Cerrar", generate: "Generar Gráfico", find_title: "Buscar y Reemplazar", find_what: "Buscar:", replace_with: "Reemplazar con:",
+                replace_all: "Reemplazar Todo", sort_title: "Ordenar Rango", sort_range: "Rango a ordenar (ej. A1:B10)", sort_order: "Criterio",
+                sort_asc: "Ascendente (A-Z)", sort_desc: "Descendente (Z-A)", sort_execute: "Ordenar", help_title: "Guía de Fórmulas y Atajos KitCalc",
+                help_formulas: "Fórmulas Soportadas:", help_shortcuts: "Atajos de Teclado:", suggestions: "Sugerencias de Fórmulas"
+            },
+            en: {
+                saved: "Saved", export: "Export / Templates", export_csv: "Export to CSV", export_json: "Export JSON Backup",
+                import_json: "Import File", tpl_budget: "Template: Budget", tpl_invoice: "Template: Invoice",
+                tpl_grades: "Template: Grades", tpl_workout: "Template: Workout", chart_btn: "Chart", find_btn: "Find",
+                sort_btn: "Sort", clear_btn: "Clear", stat_sum: "Sum", stat_avg: "Average", stat_count: "Count",
+                chart_title: "Generate Statistical Chart", chart_type: "Chart Type", chart_range: "Data Range (e.g. A1:B10)",
+                close: "Close", generate: "Generate Chart", find_title: "Find & Replace", find_what: "Find:", replace_with: "Replace with:",
+                replace_all: "Replace All", sort_title: "Sort Range", sort_range: "Range to sort (e.g. A1:B10)", sort_order: "Criteria",
+                sort_asc: "Ascending (A-Z)", sort_desc: "Descending (Z-A)", sort_execute: "Sort", help_title: "KitCalc Formulas & Shortcuts Guide",
+                help_formulas: "Supported Formulas:", help_shortcuts: "Keyboard Shortcuts:", suggestions: "Formula Suggestions"
+            },
+            pt: {
+                saved: "Salvo", export: "Exportar / Modelos", export_csv: "Exportar para CSV", export_json: "Exportar Backup JSON",
+                import_json: "Importar Arquivo", tpl_budget: "Modelo: Orçamento", tpl_invoice: "Modelo: Fatura",
+                tpl_grades: "Modelo: Notas", tpl_workout: "Modelo: Treino", chart_btn: "Gráfico", find_btn: "Localizar",
+                sort_btn: "Ordenar", clear_btn: "Limpar", stat_sum: "Soma", stat_avg: "Média", stat_count: "Contagem",
+                chart_title: "Gerar Gráfico Estatístico", chart_type: "Tipo de Gráfico", chart_range: "Intervalo de Dados (ex. A1:B10)",
+                close: "Fechar", generate: "Gerar Gráfico", find_title: "Localizar e Substituir", find_what: "Localizar:", replace_with: "Substituir por:",
+                replace_all: "Substituir Tudo", sort_title: "Ordenar Intervalo", sort_range: "Intervalo (ex. A1:B10)", sort_order: "Critério",
+                sort_asc: "Crescente (A-Z)", sort_desc: "Decrescente (Z-A)", sort_execute: "Ordenar", help_title: "Guia de Fórmulas e Atalhos KitCalc",
+                help_formulas: "Fórmulas Suportadas:", help_shortcuts: "Atalhos de Teclado:", suggestions: "Sugestões de Fórmulas"
+            },
+            fr: {
+                saved: "Enregistré", export: "Exporter / Modèles", export_csv: "Exporter en CSV", export_json: "Exporter Sauvegarde JSON",
+                import_json: "Importer Fichier", tpl_budget: "Modèle : Budget", tpl_invoice: "Modèle : Facture",
+                tpl_grades: "Modèle : Notes", tpl_workout: "Modèle : Entraînement", chart_btn: "Graphique", find_btn: "Rechercher",
+                sort_btn: "Trier", clear_btn: "Effacer", stat_sum: "Somme", stat_avg: "Moyenne", stat_count: "Nombre",
+                chart_title: "Générer un Graphique", chart_type: "Type de Graphique", chart_range: "Plage de Données (ex. A1:B10)",
+                close: "Fermer", generate: "Générer", find_title: "Rechercher et Remplacer", find_what: "Rechercher :", replace_with: "Remplacer par :",
+                replace_all: "Tout Remplacer", sort_title: "Trier la Plage", sort_range: "Plage à trier (ex. A1:B10)", sort_order: "Critère",
+                sort_asc: "Croissant (A-Z)", sort_desc: "Décroissant (Z-A)", sort_execute: "Trier", help_title: "Guide des Formules et Raccourcis KitCalc",
+                help_formulas: "Formules Pris en Charge :", help_shortcuts: "Raccourcis Clavier :", suggestions: "Suggestions de Formules"
+            },
+            de: {
+                saved: "Gespeichert", export: "Exportieren / Vorlagen", export_csv: "Als CSV exportieren", export_json: "JSON-Backup exportieren",
+                import_json: "Datei importieren", tpl_budget: "Vorlage: Budget", tpl_invoice: "Vorlage: Rechnung",
+                tpl_grades: "Vorlage: Noten", tpl_workout: "Vorlage: Training", chart_btn: "Diagramm", find_btn: "Suchen",
+                sort_btn: "Sortieren", clear_btn: "Löschen", stat_sum: "Summe", stat_avg: "Durchschnitt", stat_count: "Anzahl",
+                chart_title: "Statistisches Diagramm erstellen", chart_type: "Diagrammtyp", chart_range: "Datenbereich (z.B. A1:B10)",
+                close: "Schließen", generate: "Generieren", find_title: "Suchen & Ersetzen", find_what: "Suchen:", replace_with: "Ersetzen durch:",
+                replace_all: "Alle ersetzen", sort_title: "Bereich sortieren", sort_range: "Bereich (z.B. A1:B10)", sort_order: "Kriterium",
+                sort_asc: "Aufsteigend (A-Z)", sort_desc: "Absteigend (Z-A)", sort_execute: "Sortieren", help_title: "KitCalc Formeln & Shortcuts",
+                help_formulas: "Unterstützte Formeln:", help_shortcuts: "Tastenkombinationen:", suggestions: "Formelvorschläge"
+            },
+            it: {
+                saved: "Salvato", export: "Esporta / Modelli", export_csv: "Esporta in CSV", export_json: "Esporta Backup JSON",
+                import_json: "Importa File", tpl_budget: "Modello: Budget", tpl_invoice: "Modello: Fattura",
+                tpl_grades: "Modello: Voti", tpl_workout: "Modello: Allenamento", chart_btn: "Grafico", find_btn: "Trova",
+                sort_btn: "Ordina", clear_btn: "Pulisci", stat_sum: "Somma", stat_avg: "Media", stat_count: "Conteggio",
+                chart_title: "Genera Grafico Statistico", chart_type: "Tipo di Grafico", chart_range: "Intervallo Dati (es. A1:B10)",
+                close: "Chiudi", generate: "Genera", find_title: "Trova e Sostituisci", find_what: "Trova:", replace_with: "Sostituisci con:",
+                replace_all: "Sostituisci Tutti", sort_title: "Ordina Intervallo", sort_range: "Intervallo (es. A1:B10)", sort_order: "Criterio",
+                sort_asc: "Crescente (A-Z)", sort_desc: "Decrescente (Z-A)", sort_execute: "Ordina", help_title: "Guida Formule e Scorciatoie KitCalc",
+                help_formulas: "Formule Supportate:", help_shortcuts: "Scorciatoie da Tastiera:", suggestions: "Suggerimenti Formule"
+            },
+            ja: {
+                saved: "保存済み", export: "エクスポート / テンプレート", export_csv: "CSVエクスポート", export_json: "JSONバックアップ",
+                import_json: "インポート", tpl_budget: "テンプレート: 予算", tpl_invoice: "テンプレート: 請求書",
+                tpl_grades: "テンプレート: 成績", tpl_workout: "テンプレート: ワークアウト", chart_btn: "グラフ", find_btn: "検索",
+                sort_btn: "並べ替え", clear_btn: "クリア", stat_sum: "合計", stat_avg: "平均", stat_count: "個数",
+                chart_title: "統計グラフの作成", chart_type: "グラフ種類", chart_range: "データ範囲 (例: A1:B10)",
+                close: "閉じる", generate: "生成", find_title: "検索と置換", find_what: "検索:", replace_with: "置換後の文字列:",
+                replace_all: "すべて置換", sort_title: "範囲の並べ替え", sort_range: "範囲 (例: A1:B10)", sort_order: "順序",
+                sort_asc: "昇順 (A-Z)", sort_desc: "降順 (Z-A)", sort_execute: "並べ替え", help_title: "KitCalc 数式とショートカットガイド",
+                help_formulas: "サポートされる数式:", help_shortcuts: "キーボードショートカット:", suggestions: "数式の候補"
+            },
+            ko: {
+                saved: "저장됨", export: "내보내기 / 템플릿", export_csv: "CSV로 내보내기", export_json: "JSON 백업 내보내기",
+                import_json: "파일 가져오기", tpl_budget: "템플릿: 예산", tpl_invoice: "템플릿: 송장",
+                tpl_grades: "템플릿: 성적표", tpl_workout: "템플릿: 운동", chart_btn: "차트", find_btn: "찾기",
+                sort_btn: "정렬", clear_btn: "지우기", stat_sum: "합계", stat_avg: "평균", stat_count: "개수",
+                chart_title: "통계 차트 생성", chart_type: "차트 종류", chart_range: "데이터 범위 (예: A1:B10)",
+                close: "닫기", generate: "생성", find_title: "찾기 및 바꾸기", find_what: "찾을 내용:", replace_with: "바꿀 내용:",
+                replace_all: "모두 바꾸기", sort_title: "범위 정렬", sort_range: "정렬 범위 (예: A1:B10)", sort_order: "기준",
+                sort_asc: "오름차순 (A-Z)", sort_desc: "내림차순 (Z-A)", sort_execute: "정렬", help_title: "KitCalc 수식 및 단축키 가이드",
+                help_formulas: "지원되는 수식:", help_shortcuts: "키보드 단축키:", suggestions: "수식 제안"
+            },
+            ru: {
+                saved: "Сохранено", export: "Экспорт / Шаблоны", export_csv: "Экспорт в CSV", export_json: "Экспорт JSON",
+                import_json: "Импорт файла", tpl_budget: "Шаблон: Бюджет", tpl_invoice: "Шаблон: Счет",
+                tpl_grades: "Шаблон: Оценки", tpl_workout: "Шаблон: Тренировки", chart_btn: "График", find_btn: "Найти",
+                sort_btn: "Сортировка", clear_btn: "Очистить", stat_sum: "Сумма", stat_avg: "Среднее", stat_count: "Количество",
+                chart_title: "Создать график", chart_type: "Тип графика", chart_range: "Диапазон данных (напр. A1:B10)",
+                close: "Закрыть", generate: "Создать", find_title: "Найти и заменить", find_what: "Найти:", replace_with: "Заменить на:",
+                replace_all: "Заменить все", sort_title: "Сортировка диапазона", sort_range: "Диапазон (напр. A1:B10)", sort_order: "Порядок",
+                sort_asc: "По возрастанию (A-Z)", sort_desc: "По убыванию (Z-A)", sort_execute: "Сортировать", help_title: "Руководство по формулам KitCalc",
+                help_formulas: "Поддерживаемые формулы:", help_shortcuts: "Горячие клавиши:", suggestions: "Подсказки формул"
+            },
+            zh: {
+                saved: "已保存", export: "导出 / 模板", export_csv: "导出 CSV", export_json: "导出 JSON 备份",
+                import_json: "导入文件", tpl_budget: "模板: 预算", tpl_invoice: "模板: 发票",
+                tpl_grades: "模板: 成绩单", tpl_workout: "模板: 健身", chart_btn: "图表", find_btn: "查找",
+                sort_btn: "排序", clear_btn: "清除", stat_sum: "求和", stat_avg: "平均值", stat_count: "计数",
+                chart_title: "生成统计图表", chart_type: "图表类型", chart_range: "数据范围 (例如 A1:B10)",
+                close: "关闭", generate: "生成", find_title: "查找和替换", find_what: "查找:", replace_with: "替换为:",
+                replace_all: "全部替换", sort_title: "排序范围", sort_range: "排序范围 (例如 A1:B10)", sort_order: "条件",
+                sort_asc: "升序 (A-Z)", sort_desc: "降序 (Z-A)", sort_execute: "排序", help_title: "KitCalc 公式与快捷键指南",
+                help_formulas: "支持的公式:", help_shortcuts: "键盘快捷键:", suggestions: "公式建议"
+            }
+        };
+
+        let currentLang = 'es';
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[lang] && translations[lang][key]) {
+                    el.innerText = translations[lang][key];
+                }
+            });
+        }
+        document.getElementById('language-select').addEventListener('change', (e) => setLanguage(e.target.value));
+
+        // --- 2. Spreadsheet Engine State & Configuration ---
+        const COLS_COUNT = 26; // A to Z
+        const ROWS_COUNT = 100; // 100 rows
+        let workbook = {
+            sheets: {
+                "Hoja1": { name: "Hoja1", data: {} }
+            },
+            activeSheet: "Hoja1"
+        };
+
+        let activeCell = { row: 0, col: 0 };
+        let selectionRange = { startRow: 0, startCol: 0, endRow: 0, endCol: 0 };
+        let isMouseDown = false;
+        let undoStack = [];
+        let redoStack = [];
+        let activeChart = null;
+
+        // Column Letter Helpers
+        function getColLetter(colIdx) {
+            let temp, letter = '';
+            while (colIdx >= 0) {
+                temp = colIdx % 26;
+                letter = String.fromCharCode(temp + 65) + letter;
+                colIdx = Math.floor((colIdx - temp) / 26) - 1;
+            }
+            return letter;
+        }
+
+        function getCellId(r, c) {
+            return getColLetter(c) + (r + 1);
+        }
+
+        // --- 3. Spreadsheet Grid Initialization & Rendering ---
+        function initGrid() {
+            const thead = document.getElementById('spreadsheet-thead');
+            const tbody = document.getElementById('spreadsheet-tbody');
+
+            // Header row
+            let headerHtml = '<tr><th class="w-12 bg-slate-100 dark:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-500 py-2">#</th>';
+            for (let c = 0; c < COLS_COUNT; c++) {
+                headerHtml += `<th class="w-28 bg-slate-100 dark:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 py-2 select-none">${getColLetter(c)}</th>`;
+            }
+            headerHtml += '</tr>';
+            thead.innerHTML = headerHtml;
+
+            // Body rows
+            let bodyHtml = '';
+            for (let r = 0; r < ROWS_COUNT; r++) {
+                bodyHtml += `<tr data-row="${r}">`;
+                bodyHtml += `<td class="bg-slate-100 dark:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-700 text-center text-xs font-semibold text-slate-500 py-1.5">${r + 1}</td>`;
+                for (let c = 0; c < COLS_COUNT; c++) {
+                    bodyHtml += `<td class="border-b border-r border-slate-200 dark:border-slate-700 p-0 relative cell" data-row="${r}" data-col="${c}" id="cell_${r}_${c}" 
+                        onmousedown="onCellMouseDown(${r}, ${c})" 
+                        onmouseover="onCellMouseOver(${r}, ${c})" 
+                        ondblclick="onCellDblClick(${r}, ${c})">
+                        <div class="w-full h-full px-2 py-1.5 text-xs truncate outline-none"></div>
+                    </td>`;
+                }
+                bodyHtml += '</tr>';
+            }
+            tbody.innerHTML = bodyHtml;
+            renderSheetTabs();
+            refreshGridValues();
+        }
+
+        function getSheetData() {
+            return workbook.sheets[workbook.activeSheet].data;
+        }
+
+        // --- 4. Formula Parser & Calculation Engine ---
+        function evaluateFormula(formulaStr, sheetData) {
+            if (!formulaStr.startsWith('=')) return formulaStr;
+            let expr = formulaStr.substring(1).toUpperCase().trim();
+
+            try {
+                // Range helpers e.g. SUM(A1:A5)
+                expr = expr.replace(/([A-Z]+\d+):([A-Z]+\d+)/g, (match, start, end) => {
+                    let values = getValuesInRange(start, end, sheetData);
+                    return `[${values.join(',')}]`;
+                });
+
+                // Functions implementation
+                expr = expr.replace(/SUMA\(\s*\[(.*?)\]\s*\)/g, (_, nums) => nums ? nums.split(',').reduce((a, b) => Number(a) + Number(b), 0) : 0);
+                expr = expr.replace(/PROMEDIO\(\s*\[(.*?)\]\s*\)/g, (_, nums) => {
+                    if (!nums) return 0;
+                    let arr = nums.split(',');
+                    return arr.reduce((a, b) => Number(a) + Number(b), 0) / arr.length;
+                });
+                expr = expr.replace(/CONTAR\(\s*\[(.*?)\]\s*\)/g, (_, nums) => nums ? nums.split(',').length : 0);
+                expr = expr.replace(/MAX\(\s*\[(.*?)\]\s*\)/g, (_, nums) => nums ? Math.max(...nums.split(',').map(Number)) : 0);
+                expr = expr.replace(/MIN\(\s*\[(.*?)\]\s*\)/g, (_, nums) => nums ? Math.min(...nums.split(',').map(Number)) : 0);
+                
+                // Single cell reference evaluation
+                expr = expr.replace(/\b([A-Z]+\d+)\b/g, (match) => {
+                    let val = sheetData[match] ? sheetData[match].value : 0;
+                    return isNaN(val) || val === '' ? 0 : Number(val);
+                });
+
+                // Safe evaluation
+                return Function(`'use strict'; return (${expr})`)();
+            } catch (err) {
+                return '#ERROR!';
+            }
+        }
+
+        function getValuesInRange(startCell, endCell, sheetData) {
+            let startR = parseInt(startCell.match(/\d+/)[0]) - 1;
+            let startC = colLetterToIndex(startCell.match(/[A-Z]+/)[0]);
+            let endR = parseInt(endCell.match(/\d+/)[0]) - 1;
+            let endC = colLetterToIndex(endCell.match(/[A-Z]+/)[0]);
+
+            let values = [];
+            for (let r = Math.min(startR, endR); r <= Math.max(startR, endR); r++) {
+                for (let c = Math.min(startC, endC); c <= Math.max(startC, endC); c++) {
+                    let id = getCellId(r, c);
+                    let val = sheetData[id] ? sheetData[id].value : 0;
+                    if (val !== '' && !isNaN(val)) values.push(Number(val));
+                }
+            }
+            return values;
+        }
+
+        function colLetterToIndex(letter) {
+            let col = 0, length = letter.length;
+            for (let i = 0; i < length; i++) {
+                col += (letter.charCodeAt(i) - 64) * Math.pow(26, length - i - 1);
+            }
+            return col - 1;
+        }
+
+        // --- 5. Selection & Interaction Logic ---
+        window.onmousedown = (e) => {
+            if (!e.target.closest('#spreadsheet-table')) isMouseDown = false;
+        };
+        window.onmouseup = () => { isMouseDown = false; };
+
+        function onCellMouseDown(r, c) {
+            isMouseDown = true;
+            activeCell = { row: r, col: c };
+            selectionRange = { startRow: r, startCol: c, endRow: r, endCol: c };
+            updateSelectionUI();
+            updateFormulaBar();
+            updateStats();
+        }
+
+        function onCellMouseOver(r, c) {
+            if (!isMouseDown) return;
+            selectionRange.endRow = r;
+            selectionRange.endCol = c;
+            updateSelectionUI();
+            updateStats();
+        }
+
+        function onCellDblClick(r, c) {
+            let cellId = getCellId(r, c);
+            let sheetData = getSheetData();
+            let currentVal = sheetData[cellId] ? (sheetData[cellId].formula || sheetData[cellId].value) : '';
+            
+            let td = document.getElementById(`cell_${r}_${c}`);
+            td.innerHTML = `<input type="text" id="inline-edit" class="w-full h-full bg-white dark:bg-slate-800 px-2 py-1 text-xs outline-none border-2 border-excel-600" value="${currentVal}" onblur="saveInlineEdit(${r}, ${c}, this.value)" onkeydown="if(event.key==='Enter') this.blur()">`;
+            let input = document.getElementById('inline-edit');
+            input.focus();
+            input.select();
+        }
+
+        function saveInlineEdit(r, c, val) {
+            saveStateToUndo();
+            let cellId = getCellId(r, c);
+            let sheetData = getSheetData();
+            if (!sheetData[cellId]) sheetData[cellId] = {};
+            
+            if (val.startsWith('=')) {
+                sheetData[cellId].formula = val;
+                sheetData[cellId].value = evaluateFormula(val, sheetData);
+            } else {
+                sheetData[cellId].formula = '';
+                sheetData[cellId].value = val;
+            }
+            refreshGridValues();
+            updateFormulaBar();
+        }
+
+        function updateSelectionUI() {
+            document.querySelectorAll('.cell').forEach(el => {
+                el.classList.remove('cell-selected', 'cell-highlight');
+                let r = parseInt(el.getAttribute('data-row'));
+                let c = parseInt(el.getAttribute('data-col'));
+
+                let minR = Math.min(selectionRange.startRow, selectionRange.endRow);
+                let maxR = Math.max(selectionRange.startRow, selectionRange.endRow);
+                let minC = Math.min(selectionRange.startCol, selectionRange.endCol);
+                let maxC = Math.max(selectionRange.startCol, selectionRange.endCol);
+
+                if (r >= minR && r <= maxR && c >= minC && c <= maxC) {
+                    if (r === activeCell.row && c === activeCell.col) {
+                        el.classList.add('cell-selected');
+                    } else {
+                        el.classList.add('cell-highlight');
+                    }
+                }
+            });
+            document.getElementById('selected-cell-display').innerText = getCellId(activeCell.row, activeCell.col);
+        }
+
+        function refreshGridValues() {
+            let sheetData = getSheetData();
+            for (let r = 0; r < ROWS_COUNT; r++) {
+                for (let c = 0; c < COLS_COUNT; c++) {
+                    let cellId = getCellId(r, c);
+                    let cellDiv = document.querySelector(`#cell_${r}_${c} div`);
+                    if (sheetData[cellId]) {
+                        let cell = sheetData[cellId];
+                        let val = cell.formula ? evaluateFormula(cell.formula, sheetData) : cell.value;
+                        
+                        // Apply number formatting
+                        if (cell.numberFormat === 'currency' && !isNaN(val) && val !== '') val = '$' + Number(val).toFixed(2);
+                        if (cell.numberFormat === 'percent' && !isNaN(val) && val !== '') val = (Number(val) * 100).toFixed(1) + '%';
+                        if (cell.numberFormat === 'decimal' && !isNaN(val) && val !== '') val = Number(val).toFixed(2);
+
+                        cellDiv.innerText = val !== undefined ? val : '';
+                        cellDiv.style.fontWeight = cell.bold ? 'bold' : 'normal';
+                        cellDiv.style.fontStyle = cell.italic ? 'italic' : 'normal';
+                        cellDiv.style.textDecoration = cell.underline ? 'underline' : 'none';
+                        cellDiv.style.color = cell.textColor || '';
+                        cellDiv.style.backgroundColor = cell.bgColor || '';
+                        cellDiv.style.textAlign = cell.align || 'left';
+                        cellDiv.style.fontFamily = cell.fontFamily || '';
+                        cellDiv.style.fontSize = cell.fontSize || '';
+                    } else {
+                        cellDiv.innerText = '';
+                        cellDiv.style = '';
+                    }
+                }
+            }
+        }
+
+        function updateStats() {
+            let sheetData = getSheetData();
+            let minR = Math.min(selectionRange.startRow, selectionRange.endRow);
+            let maxR = Math.max(selectionRange.startRow, selectionRange.endRow);
+            let minC = Math.min(selectionRange.startCol, selectionRange.endCol);
+            let maxC = Math.max(selectionRange.startCol, selectionRange.endCol);
+
+            let sum = 0, count = 0, nums = [];
+            for (let r = minR; r <= maxR; r++) {
+                for (let c = minC; c <= maxC; c++) {
+                    let val = sheetData[getCellId(r, c)] ? sheetData[getCellId(r, c)].value : 0;
+                    if (val !== '' && !isNaN(val)) {
+                        sum += Number(val);
+                        nums.push(Number(val));
+                    }
+                    count++;
+                }
+            }
+            document.getElementById('stat-sum').innerText = sum;
+            document.getElementById('stat-avg').innerText = nums.length ? (sum / nums.length).toFixed(2) : 0;
+            document.getElementById('stat-count').innerText = count;
+        }
+
+        // --- 6. Formatting & Ribbon Operations ---
+        function formatSelectedCells(type, value) {
+            saveStateToUndo();
+            let sheetData = getSheetData();
+            let minR = Math.min(selectionRange.startRow, selectionRange.endRow);
+            let maxR = Math.max(selectionRange.startRow, selectionRange.endRow);
+            let minC = Math.min(selectionRange.startCol, selectionRange.endCol);
+            let maxC = Math.max(selectionRange.startCol, selectionRange.endCol);
+
+            for (let r = minR; r <= maxR; r++) {
+                for (let c = minC; c <= maxC; c++) {
+                    let id = getCellId(r, c);
+                    if (!sheetData[id]) sheetData[id] = {};
+                    if (type === 'bold') sheetData[id].bold = !sheetData[id].bold;
+                    else if (type === 'italic') sheetData[id].italic = !sheetData[id].italic;
+                    else if (type === 'underline') sheetData[id].underline = !sheetData[id].underline;
+                    else if (type === 'textColor') sheetData[id].textColor = value;
+                    else if (type === 'bgColor') sheetData[id].bgColor = value;
+                    else if (type === 'align') sheetData[id].align = value;
+                    else if (type === 'fontFamily') sheetData[id].fontFamily = value;
+                    else if (type === 'fontSize') sheetData[id].fontSize = value;
+                    else if (type === 'numberFormat') sheetData[id].numberFormat = value;
+                }
+            }
+            refreshGridValues();
+        }
+
+        function clearSelectedCells() {
+            saveStateToUndo();
+            let sheetData = getSheetData();
+            let minR = Math.min(selectionRange.startRow, selectionRange.endRow);
+            let maxR = Math.max(selectionRange.startRow, selectionRange.endRow);
+            let minC = Math.min(selectionRange.startCol, selectionRange.endCol);
+            let maxC = Math.max(selectionRange.startCol, selectionRange.endCol);
+
+            for (let r = minR; r <= maxR; r++) {
+                for (let c = minC; c <= maxC; c++) {
+                    delete sheetData[getCellId(r, c)];
+                }
+            }
+            refreshGridValues();
+        }
+
+        // --- 7. Formula Bar Interaction & Autocomplete ---
+        function updateFormulaBar() {
+            let sheetData = getSheetData();
+            let cellId = getCellId(activeCell.row, activeCell.col);
+            let val = sheetData[cellId] ? (sheetData[cellId].formula || sheetData[cellId].value || '') : '';
+            document.getElementById('formula-bar-input').value = val;
+        }
+
+        function onFormulaBarInput(e) {
+            let val = e.target.value;
+            let cellId = getCellId(activeCell.row, activeCell.col);
+            let sheetData = getSheetData();
+            if (!sheetData[cellId]) sheetData[cellId] = {};
+
+            if (val.startsWith('=')) {
+                sheetData[cellId].formula = val;
+                sheetData[cellId].value = evaluateFormula(val, sheetData);
+
+                // Autocomplete helper
+                let query = val.toUpperCase();
+                let suggestionsBox = document.getElementById('formula-autocomplete');
+                let list = document.getElementById('formula-suggestions-list');
+                const formulas = ['SUMA(', 'PROMEDIO(', 'CONTAR(', 'MAX(', 'MIN(', 'SI(', 'CONCAT(', 'PRODUCTO(', 'REDONDEO(', 'RAIZ('];
+                
+                let matches = formulas.filter(f => f.includes(query.replace('=', '')));
+                if (matches.length > 0 && query.length > 1) {
+                    list.innerHTML = matches.map(m => `<div class="px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer rounded font-mono" onclick="selectFormulaSuggestion('${m}')">${m}</div>`).join('');
+                    suggestionsBox.classList.remove('hidden');
+                } else {
+                    suggestionsBox.classList.add('hidden');
+                }
+            } else {
+                sheetData[cellId].formula = '';
+                sheetData[cellId].value = val;
+                document.getElementById('formula-autocomplete').classList.add('hidden');
+            }
+            refreshGridValues();
+        }
+
+        function selectFormulaSuggestion(formula) {
+            let input = document.getElementById('formula-bar-input');
+            input.value = '=' + formula;
+            input.focus();
+            document.getElementById('formula-autocomplete').classList.add('hidden');
+        }
+
+        function onFormulaBarKeydown(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('formula-autocomplete').classList.add('hidden');
+                refreshGridValues();
+            }
+        }
+
+        // --- 8. Undo / Redo System ---
+        function saveStateToUndo() {
+            undoStack.push(JSON.parse(JSON.stringify(workbook)));
+            if (undoStack.length > 50) undoStack.shift();
+            redoStack = [];
+        }
+
+        function undo() {
+            if (undoStack.length === 0) return;
+            redoStack.push(JSON.parse(JSON.stringify(workbook)));
+            workbook = undoStack.pop();
+            refreshGridValues();
+            renderSheetTabs();
+        }
+
+        function redo() {
+            if (redoStack.length === 0) return;
+            undoStack.push(JSON.parse(JSON.stringify(workbook)));
+            workbook = redoStack.pop();
+            refreshGridValues();
+            renderSheetTabs();
+        }
+
+        // --- 9. Multiple Sheets Manager ---
+        function renderSheetTabs() {
+            const container = document.getElementById('sheet-tabs-container');
+            let html = '';
+            for (let name in workbook.sheets) {
+                let isActive = name === workbook.activeSheet;
+                let activeClass = isActive ? 'bg-white dark:bg-slate-900 border-b-2 border-excel-600 font-bold text-excel-600' : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
+                html += `<div class="px-3 py-1.5 rounded-t-lg border border-slate-200 dark:border-slate-700 text-xs cursor-pointer flex items-center space-x-2 ${activeClass}" onclick="switchSheet('${name}')">
+                    <span>${name}</span>
+                    ${Object.keys(workbook.sheets).length > 1 ? `<i class="fa-solid fa-xmark hover:text-rose-500" onclick="event.stopPropagation(); deleteSheet('${name}')"></i>` : ''}
+                </div>`;
+            }
+            container.innerHTML = html;
+            document.getElementById('current-sheet-name-label').innerText = workbook.activeSheet;
+        }
+
+        function addSheet() {
+            saveStateToUndo();
+            let newName = `Hoja${Object.keys(workbook.sheets).length + 1}`;
+            workbook.sheets[newName] = { name: newName, data: {} };
+            workbook.activeSheet = newName;
+            initGrid();
+        }
+
+        function switchSheet(name) {
+            workbook.activeSheet = name;
+            initGrid();
+        }
+
+        function deleteSheet(name) {
+            if (Object.keys(workbook.sheets).length <= 1) return;
+            saveStateToUndo();
+            delete workbook.sheets[name];
+            workbook.activeSheet = Object.keys(workbook.sheets)[0];
+            initGrid();
+        }
+
+        // --- 10. Advanced Tools: Chart, Find, Sort ---
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.getElementById(id).classList.add('flex'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }
+
+        function renderChart() {
+            let type = document.getElementById('chart-type-select').value;
+            let range = document.getElementById('chart-range-input').value.toUpperCase();
+            let [start, end] = range.split(':');
+            if (!start || !end) return;
+
+            let sheetData = getSheetData();
+            let labels = [], dataVals = [];
+
+            let startR = parseInt(start.match(/\d+/)[0]) - 1;
+            let startC = colLetterToIndex(start.match(/[A-Z]+/)[0]);
+            let endR = parseInt(end.match(/\d+/)[0]) - 1;
+            let endC = colLetterToIndex(end.match(/[A-Z]+/)[0]);
+
+            for (let r = startR; r <= endR; r++) {
+                let lblId = getCellId(r, startC);
+                let valId = getCellId(r, startC + 1);
+                labels.push(sheetData[lblId] ? sheetData[lblId].value : `Fila ${r+1}`);
+                let v = sheetData[valId] ? sheetData[valId].value : 0;
+                dataVals.push(isNaN(v) ? 0 : Number(v));
+            }
+
+            let ctx = document.getElementById('dynamic-chart-canvas').getContext('2d');
+            if (activeChart) activeChart.destroy();
+
+            activeChart = new Chart(ctx, {
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Valores',
+                        data: dataVals,
+                        backgroundColor: ['#16a34a', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function executeFindReplace() {
+            let find = document.getElementById('find-input').value;
+            let replace = document.getElementById('replace-input').value;
+            if (!find) return;
+
+            saveStateToUndo();
+            let sheetData = getSheetData();
+            for (let id in sheetData) {
+                if (sheetData[id].value && sheetData[id].value.toString().includes(find)) {
+                    sheetData[id].value = sheetData[id].value.toString().replaceAll(find, replace);
+                }
+            }
+            refreshGridValues();
+            closeModal('find-modal');
+        }
+
+        function executeSort() {
+            let range = document.getElementById('sort-range-input').value.toUpperCase();
+            let order = document.getElementById('sort-order-select').value;
+            let [start, end] = range.split(':');
+            if (!start || !end) return;
+
+            saveStateToUndo();
+            let sheetData = getSheetData();
+            let startR = parseInt(start.match(/\d+/)[0]) - 1;
+            let startC = colLetterToIndex(start.match(/[A-Z]+/)[0]);
+            let endR = parseInt(end.match(/\d+/)[0]) - 1;
+
+            let rowsToSort = [];
+            for (let r = startR; r <= endR; r++) {
+                let cellId = getCellId(r, startC);
+                rowsToSort.push({ row: r, val: sheetData[cellId] ? sheetData[cellId].value : '' });
+            }
+
+            rowsToSort.sort((a, b) => {
+                if (order === 'asc') return a.val > b.val ? 1 : -1;
+                return a.val < b.val ? 1 : -1;
+            });
+
+            // Reassign sorted data
+            let newValues = rowsToSort.map(item => sheetData[getCellId(item.row, startC)] || {});
+            for (let i = 0; i < rowsToSort.length; i++) {
+                sheetData[getCellId(startR + i, startC)] = newValues[i];
+            }
+
+            refreshGridValues();
+            closeModal('sort-modal');
+        }
+
+        // --- 11. Import / Export & Built-in Templates ---
+        function exportCSV() {
+            let sheetData = getSheetData();
+            let csv = [];
+            for (let r = 0; r < ROWS_COUNT; r++) {
+                let row = [];
+                for (let c = 0; c < COLS_COUNT; c++) {
+                    let id = getCellId(r, c);
+                    let val = sheetData[id] ? (sheetData[id].value || '') : '';
+                    row.push(`"${val}"`);
+                }
+                csv.push(row.join(','));
+            }
+            let blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = 'KitCalc_Export.csv';
+            a.click();
+        }
+
+        function exportJSON() {
+            let blob = new Blob([JSON.stringify(workbook, null, 2)], { type: 'application/json' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = 'KitCalc_Backup.json';
+            a.click();
+        }
+
+        function triggerImport() { document.getElementById('import-file-input').click(); }
+        function handleFileImport(e) {
+            let file = e.target.files[0];
+            if (!file) return;
+            let reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    workbook = JSON.parse(evt.target.result);
+                    initGrid();
+                } catch (err) {
+                    alert('Error al importar archivo JSON.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Templates
+        function loadTemplate(type) {
+            saveStateToUndo();
+            let sheetData = getSheetData();
+            // Clear current sheet
+            workbook.sheets[workbook.activeSheet].data = {};
+            sheetData = getSheetData();
+
+            if (type === 'budget') {
+                sheetData['A1'] = { value: 'Categoría', bold: true, bgColor: '#16a34a', textColor: '#ffffff' };
+                sheetData['B1'] = { value: 'Presupuesto', bold: true, bgColor: '#16a34a', textColor: '#ffffff' };
+                sheetData['A2'] = { value: 'Alquiler' }; sheetData['B2'] = { value: 800, numberFormat: 'currency' };
+                sheetData['A3'] = { value: 'Alimentos' }; sheetData['B3'] = { value: 400, numberFormat: 'currency' };
+                sheetData['A4'] = { value: 'Servicios' }; sheetData['B4'] = { value: 150, numberFormat: 'currency' };
+                sheetData['A5'] = { value: 'Total', bold: true }; sheetData['B5'] = { formula: '=SUMA(B2:B4)', bold: true, numberFormat: 'currency' };
+            } else if (type === 'invoice') {
+                sheetData['A1'] = { value: 'Producto', bold: true, bgColor: '#3b82f6', textColor: '#ffffff' };
+                sheetData['B1'] = { value: 'Cantidad', bold: true, bgColor: '#3b82f6', textColor: '#ffffff' };
+                sheetData['C1'] = { value: 'Precio Unitario', bold: true, bgColor: '#3b82f6', textColor: '#ffffff' };
+                sheetData['A2'] = { value: 'Consultoría' }; sheetData['B2'] = { value: 10 }; sheetData['C2'] = { value: 50, numberFormat: 'currency' };
+                sheetData['A3'] = { value: 'Desarrollo Web' }; sheetData['B3'] = { value: 40 }; sheetData['C3'] = { value: 80, numberFormat: 'currency' };
+            } else if (type === 'grades') {
+                sheetData['A1'] = { value: 'Estudiante', bold: true }; sheetData['B1'] = { value: 'Examen 1', bold: true }; sheetData['C1'] = { value: 'Examen 2', bold: true };
+                sheetData['A2'] = { value: 'Ana Pérez' }; sheetData['B2'] = { value: 85 }; sheetData['C2'] = { value: 90 };
+                sheetData['A3'] = { value: 'Carlos Gómez' }; sheetData['B3'] = { value: 78 }; sheetData['C3'] = { value: 82 };
+            } else if (type === 'workout') {
+                sheetData['A1'] = { value: 'Ejercicio', bold: true }; sheetData['B1'] = { value: 'Series', bold: true }; sheetData['C1'] = { value: 'Repeticiones', bold: true };
+                sheetData['A2'] = { value: 'Sentadillas' }; sheetData['B2'] = { value: 4 }; sheetData['C2'] = { value: 12 };
+                sheetData['A3'] = { value: 'Press de Banca' }; sheetData['B3'] = { value: 3 }; sheetData['C3'] = { value: 10 };
+            }
+            refreshGridValues();
+        }
+
+        // Theme Toggle
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+        });
+
+        // Initialize application on load
+        window.onload = function() {
+            setLanguage('es');
+            initGrid();
+        };
+    </script>
+</body>
+</html>
