@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KitPoint - Advanced Web Presentations</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f4ff',
+                            100: '#e0e9ff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                            accent: '#ea580c'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2canvas for presentation exporting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* Custom Styles & Utilities */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,700;1,300&family=Fira+Code:wght@400;600&family=Poppins:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        .canvas-container {
+            perspective: 1000px;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .dark .canvas-container {
+            background-image: radial-gradient(#334155 1px, transparent 1px);
+        }
+
+        .slide-canvas {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transform-origin: center center;
+            transition: transform 0.15s ease-out;
+        }
+
+        /* Slide Transition Animations */
+        .trans-fade { animation: fadeIn 0.5s ease-in-out; }
+        .trans-slide-left { animation: slideLeft 0.5s ease-in-out; }
+        .trans-slide-right { animation: slideRight 0.5s ease-in-out; }
+        .trans-zoom { animation: zoomIn 0.5s ease-in-out; }
+        .trans-flip { animation: flipIn 0.6s ease-in-out; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideLeft { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes slideRight { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+        @keyframes zoomIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes flipIn { from { transform: rotateY(90deg); opacity: 0; } to { transform: rotateY(0deg); opacity: 1; } }
+
+        /* Element animations */
+        .anim-fade-in { animation: fadeIn 0.8s forwards; }
+        .anim-fly-in { animation: slideLeft 0.8s forwards; }
+        .anim-bounce { animation: bounce 1s infinite; }
+        .anim-pulse { animation: pulse 1.5s infinite; }
+
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.2);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0,0,0,0.3);
+        }
+
+        /* Permitir escribir y seleccionar texto al editar */
+        [contenteditable="true"], [contenteditable="true"] * {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            cursor: text !important;
+        }
+        .editing-text { outline: 2px solid #2563eb !important; background: rgba(37,99,235,0.06); }
+        .text-el { cursor: move; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .cell-edit { min-width: 20px; }
+
+        .element-selected {
+            outline: 2px dashed #2563eb !important;
+            outline-offset: 2px;
+        }
+
+        /* Resizer Handles */
+        .resize-handle {
+            width: 10px;
+            height: 10px;
+            background-color: #2563eb;
+            border: 1px solid #ffffff;
+            position: absolute;
+            border-radius: 2px;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 h-screen w-screen flex flex-col font-sans">
+
+    <!-- Top Navigation Bar / Menu Header -->
+    <header class="bg-slate-800 text-white flex items-center justify-between px-4 py-1.5 border-b border-slate-700 text-sm select-none">
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 bg-gradient-to-r from-orange-500 to-amber-500 px-2.5 py-1 rounded font-bold text-white tracking-wide shadow-sm">
+                <i class="fa-solid fa-clone text-lg"></i>
+                <span class="text-base">KitPoint</span>
+            </div>
+            <input id="presentation-title" type="text" value="Untitled Presentation" class="bg-transparent hover:bg-slate-700 focus:bg-slate-700 text-white font-medium px-2 py-0.5 rounded outline-none transition border border-transparent focus:border-slate-500 text-sm w-48 sm:w-64">
+            <span class="text-xs text-slate-400 hidden md:inline" id="txt-saved-status">Auto-saved</span>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <!-- Language Selector -->
+            <div class="relative inline-block text-left">
+                <select id="lang-selector" onchange="changeLanguage(this.value)" class="bg-slate-700 hover:bg-slate-600 text-xs text-white rounded px-2 py-1 outline-none cursor-pointer border border-slate-600">
+                    <option value="en">English (EN)</option>
+                    <option value="es">Español (ES)</option>
+                    <option value="pt">Português (PT)</option>
+                    <option value="fr">Français (FR)</option>
+                    <option value="de">Deutsch (DE)</option>
+                    <option value="it">Italiano (IT)</option>
+                    <option value="ja">日本語 (JA)</option>
+                    <option value="ko">한국어 (KO)</option>
+                    <option value="ru">Русский (RU)</option>
+                    <option value="zh">中文 (ZH)</option>
+                </select>
+            </div>
+
+            <!-- Dark/Light Theme Toggle -->
+            <button onclick="toggleDarkMode()" class="p-1.5 hover:bg-slate-700 rounded text-slate-300 hover:text-white transition" title="Toggle UI Theme">
+                <i class="fa-solid fa-moon text-sm dark:hidden"></i>
+                <i class="fa-solid fa-sun text-sm hidden dark:block text-amber-400"></i>
+            </button>
+
+            <!-- Present Button -->
+            <button onclick="startPresentation()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-xs font-semibold flex items-center space-x-1.5 shadow transition">
+                <i class="fa-solid fa-play"></i>
+                <span data-i18n="btn-present">Present</span>
+            </button>
+
+            <!-- Export Quick Menu -->
+            <button onclick="exportJSON()" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded text-xs font-medium flex items-center space-x-1 shadow transition" title="Save Project">
+                <i class="fa-solid fa-download"></i>
+                <span class="hidden sm:inline" data-i18n="btn-save">Save</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Ribbon Tabs Header -->
+    <nav class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-xs flex px-2 space-x-1 overflow-x-auto select-none">
+        <button onclick="switchTab('file')" class="tab-btn py-1.5 px-3 border-b-2 border-transparent font-medium hover:text-blue-600 dark:hover:text-blue-400 active-tab border-blue-600 text-blue-600 dark:text-blue-400" id="tab-file" data-i18n="tab-file">File</button>
+        <button onclick="switchTab('home')" class="tab-btn py-1.5 px-3 border-b-2 border-transparent font-medium hover:text-blue-600 dark:hover:text-blue-400 text-slate-600 dark:text-slate-300" id="tab-home" data-i18n="tab-home">Home</button>
+        <button onclick="switchTab('insert')" class="tab-btn py-1.5 px-3 border-b-2 border-transparent font-medium hover:text-blue-600 dark:hover:text-blue-400 text-slate-600 dark:text-slate-300" id="tab-insert" data-i18n="tab-insert">Insert</button>
+        <button onclick="switchTab('design')" class="tab-btn py-1.5 px-3 border-b-2 border-transparent font-medium hover:text-blue-600 dark:hover:text-blue-400 text-slate-600 dark:text-slate-300" id="tab-design" data-i18n="tab-design">Design</button>
+        <button onclick="switchTab('transitions')" class="tab-btn py-1.5 px-3 border-b-2 border-transparent font-medium hover:text-blue-600 dark:hover:text-blue-400 text-slate-600 dark:text-slate-300" id="tab-transitions" data-i18n="tab-transitions">Transitions</button>
+        <button onclick="switchTab('animations')" class="tab-btn py-1.5 px-3 border-b-2 border-transparent font-medium hover:text-blue-600 dark:hover:text-blue-400 text-slate-600 dark:text-slate-300" id="tab-animations" data-i18n="tab-animations">Animations</button>
+        <button onclick="switchTab('ai')" class="tab-btn py-1.5 px-3 border-b-2 border-transparent font-medium text-amber-600 dark:text-amber-400 flex items-center space-x-1" id="tab-ai"><i class="fa-solid fa-wand-magic-sparkles"></i><span data-i18n="tab-ai">AI Tools</span></button>
+    </nav>
+
+    <!-- Ribbon Content Bar -->
+    <div class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 p-2 min-h-[68px] flex items-center space-x-4 overflow-x-auto text-xs select-none">
+        <!-- FILE TAB -->
+        <div id="ribbon-file" class="ribbon-panel flex items-center space-x-3">
+            <button onclick="addNewSlide()" class="flex flex-col items-center p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200">
+                <i class="fa-solid fa-file-circle-plus text-base text-blue-600"></i>
+                <span data-i18n="lbl-new-slide">New Slide</span>
+            </button>
+            <div class="h-8 w-px bg-slate-300 dark:bg-slate-700"></div>
+            <label class="flex flex-col items-center p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200 cursor-pointer">
+                <i class="fa-solid fa-folder-open text-base text-amber-500"></i>
+                <span data-i18n="lbl-open">Open JSON</span>
+                <input type="file" accept=".json" onchange="importJSON(event)" class="hidden">
+            </label>
+            <button onclick="exportJSON()" class="flex flex-col items-center p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200">
+                <i class="fa-solid fa-file-export text-base text-emerald-600"></i>
+                <span data-i18n="lbl-export-json">Save JSON</span>
+            </button>
+            <button onclick="exportPNG()" class="flex flex-col items-center p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200">
+                <i class="fa-solid fa-image text-base text-indigo-600"></i>
+                <span data-i18n="lbl-export-image">Export Slide PNG</span>
+            </button>
+            <div class="h-8 w-px bg-slate-300 dark:bg-slate-700"></div>
+            <!-- Preset Templates -->
+            <div class="flex flex-col">
+                <span class="text-[10px] text-slate-400 font-medium mb-1" data-i18n="lbl-templates">Templates</span>
+                <div class="flex space-x-1">
+                    <button onclick="loadTemplate('pitch')" class="px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100" data-i18n="tmpl-pitch">Pitch Deck</button>
+                    <button onclick="loadTemplate('business')" class="px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100" data-i18n="tmpl-business">Business</button>
+                    <button onclick="loadTemplate('education')" class="px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100" data-i18n="tmpl-edu">Education</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- HOME TAB -->
+        <div id="ribbon-home" class="ribbon-panel hidden flex items-center space-x-3">
+            <!-- Text Formatting controls -->
+            <div class="flex items-center space-x-1">
+                <select id="font-family" onchange="applyTextStyle('fontFamily', this.value)" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-1.5 py-1 text-xs outline-none">
+                    <option value="Inter">Inter</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Merriweather">Merriweather</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Fira Code">Monospace</option>
+                </select>
+                <select id="font-size" onchange="applyTextStyle('fontSize', this.value + 'px')" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-1 py-1 text-xs outline-none">
+                    <option value="12">12</option>
+                    <option value="16">16</option>
+                    <option value="20">20</option>
+                    <option value="24" selected>24</option>
+                    <option value="32">32</option>
+                    <option value="48">48</option>
+                    <option value="64">64</option>
+                </select>
+            </div>
+            <div class="flex items-center space-x-1 bg-white dark:bg-slate-700 p-0.5 rounded border border-slate-300 dark:border-slate-600">
+                <button onclick="toggleTextStyle('bold')" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-slate-700 dark:text-slate-200 font-bold" title="Bold">B</button>
+                <button onclick="toggleTextStyle('italic')" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-slate-700 dark:text-slate-200 italic" title="Italic">I</button>
+                <button onclick="toggleTextStyle('underline')" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-slate-700 dark:text-slate-200 underline" title="Underline">U</button>
+            </div>
+            <div class="flex items-center space-x-1 bg-white dark:bg-slate-700 p-0.5 rounded border border-slate-300 dark:border-slate-600">
+                <button onclick="applyTextStyle('textAlign', 'left')" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"><i class="fa-solid fa-align-left"></i></button>
+                <button onclick="applyTextStyle('textAlign', 'center')" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"><i class="fa-solid fa-align-center"></i></button>
+                <button onclick="applyTextStyle('textAlign', 'right')" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"><i class="fa-solid fa-align-right"></i></button>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-1">
+                    <span class="text-[10px] text-slate-500">Text Color</span>
+                    <input type="color" id="text-color" onchange="applyTextStyle('color', this.value)" class="w-6 h-6 rounded cursor-pointer border border-slate-300">
+                </div>
+                <div class="flex items-center space-x-1">
+                    <span class="text-[10px] text-slate-500">Fill Color</span>
+                    <input type="color" id="fill-color" onchange="applyElementStyle('backgroundColor', this.value)" class="w-6 h-6 rounded cursor-pointer border border-slate-300" value="#ffffff">
+                </div>
+            </div>
+            <div class="h-8 w-px bg-slate-300 dark:bg-slate-700"></div>
+            <!-- Delete / Duplicate Elements -->
+            <button onclick="duplicateSelectedElement()" class="p-1.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 rounded text-slate-700 dark:text-slate-200" title="Duplicate Element">
+                <i class="fa-solid fa-clone text-slate-600 dark:text-slate-300"></i>
+            </button>
+            <button onclick="deleteSelectedElement()" class="p-1.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-red-50 text-red-600 rounded" title="Delete Element">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+
+        <!-- INSERT TAB -->
+        <div id="ribbon-insert" class="ribbon-panel hidden flex items-center space-x-3">
+            <button onclick="addTextElement()" class="flex flex-col items-center p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200">
+                <i class="fa-solid fa-font text-base text-blue-500"></i>
+                <span data-i18n="lbl-text">Text Box</span>
+            </button>
+            <div class="h-8 w-px bg-slate-300 dark:bg-slate-700"></div>
+            <!-- Shapes -->
+            <div class="flex flex-col">
+                <span class="text-[10px] text-slate-400 font-medium mb-1" data-i18n="lbl-shapes">Shapes</span>
+                <div class="flex space-x-1">
+                    <button onclick="addShape('rect')" class="p-1 bg-white dark:bg-slate-700 border rounded hover:bg-slate-100" title="Rectangle"><i class="fa-regular fa-square"></i></button>
+                    <button onclick="addShape('circle')" class="p-1 bg-white dark:bg-slate-700 border rounded hover:bg-slate-100" title="Circle"><i class="fa-regular fa-circle"></i></button>
+                    <button onclick="addShape('triangle')" class="p-1 bg-white dark:bg-slate-700 border rounded hover:bg-slate-100" title="Triangle"><i class="fa-solid fa-play -rotate-90 text-xs"></i></button>
+                    <button onclick="addShape('star')" class="p-1 bg-white dark:bg-slate-700 border rounded hover:bg-slate-100" title="Star"><i class="fa-regular fa-star"></i></button>
+                    <button onclick="addShape('arrow')" class="p-1 bg-white dark:bg-slate-700 border rounded hover:bg-slate-100" title="Arrow"><i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+            </div>
+            <div class="h-8 w-px bg-slate-300 dark:bg-slate-700"></div>
+            <!-- Images & Media -->
+            <label class="flex flex-col items-center p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200 cursor-pointer">
+                <i class="fa-solid fa-image text-base text-emerald-500"></i>
+                <span data-i18n="lbl-image">Image</span>
+                <input type="file" accept="image/*" onchange="insertImage(event)" class="hidden">
+            </label>
+            <button onclick="insertTable()" class="flex flex-col items-center p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200">
+                <i class="fa-solid fa-table text-base text-purple-500"></i>
+                <span data-i18n="lbl-table">Table</span>
+            </button>
+            <button onclick="insertChart()" class="flex flex-col items-center p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200">
+                <i class="fa-solid fa-chart-column text-base text-amber-500"></i>
+                <span data-i18n="lbl-chart">Chart</span>
+            </button>
+        </div>
+
+        <!-- DESIGN TAB -->
+        <div id="ribbon-design" class="ribbon-panel hidden flex items-center space-x-4">
+            <div class="flex flex-col">
+                <span class="text-[10px] text-slate-400 font-medium mb-1" data-i18n="lbl-themes">Slide Themes</span>
+                <div class="flex space-x-1">
+                    <button onclick="applyTheme('modern')" class="px-2 py-1 bg-white text-slate-900 border rounded text-xs hover:border-blue-500 font-medium">Modern Minimal</button>
+                    <button onclick="applyTheme('corporate')" class="px-2 py-1 bg-slate-800 text-white border rounded text-xs hover:border-blue-500 font-medium">Corporate Dark</button>
+                    <button onclick="applyTheme('vibrant')" class="px-2 py-1 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded text-xs font-medium">Vibrant Creative</button>
+                    <button onclick="applyTheme('nature')" class="px-2 py-1 bg-emerald-700 text-white rounded text-xs font-medium">Nature Fresh</button>
+                    <button onclick="applyTheme('sunset')" class="px-2 py-1 bg-amber-500 text-slate-900 rounded text-xs font-medium">Sunset Gold</button>
+                </div>
+            </div>
+            <div class="h-8 w-px bg-slate-300 dark:bg-slate-700"></div>
+            <!-- Slide Ratio -->
+            <div class="flex flex-col">
+                <span class="text-[10px] text-slate-400 font-medium mb-1" data-i18n="lbl-aspect-ratio">Aspect Ratio</span>
+                <div class="flex space-x-1">
+                    <button onclick="setAspectRatio('16:9')" id="btn-ratio-169" class="px-2 py-0.5 bg-blue-600 text-white rounded">16:9</button>
+                    <button onclick="setAspectRatio('4:3')" id="btn-ratio-43" class="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded">4:3</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TRANSITIONS TAB -->
+        <div id="ribbon-transitions" class="ribbon-panel hidden flex items-center space-x-3">
+            <span class="text-[10px] text-slate-400 font-medium" data-i18n="lbl-slide-transition">Slide Transition Effect:</span>
+            <select id="slide-transition-select" onchange="setSlideTransition(this.value)" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-xs outline-none">
+                <option value="none">None</option>
+                <option value="trans-fade">Fade</option>
+                <option value="trans-slide-left">Slide Left</option>
+                <option value="trans-slide-right">Slide Right</option>
+                <option value="trans-zoom">Zoom In</option>
+                <option value="trans-flip">Flip</option>
+            </select>
+            <button onclick="previewTransition()" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs flex items-center space-x-1">
+                <i class="fa-solid fa-play text-xs"></i>
+                <span data-i18n="btn-preview">Preview</span>
+            </button>
+        </div>
+
+        <!-- ANIMATIONS TAB -->
+        <div id="ribbon-animations" class="ribbon-panel hidden flex items-center space-x-3">
+            <span class="text-[10px] text-slate-400 font-medium" data-i18n="lbl-element-anim">Element Animation:</span>
+            <select id="element-anim-select" onchange="setElementAnimation(this.value)" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-xs outline-none">
+                <option value="none">None</option>
+                <option value="anim-fade-in">Fade In</option>
+                <option value="anim-fly-in">Fly In</option>
+                <option value="anim-bounce">Bounce</option>
+                <option value="anim-pulse">Pulse</option>
+            </select>
+        </div>
+
+        <!-- AI TAB -->
+        <div id="ribbon-ai" class="ribbon-panel hidden flex items-center space-x-3">
+            <button onclick="aiGenerateOutline()" class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded font-medium shadow flex items-center space-x-1 hover:brightness-110">
+                <i class="fa-solid fa-bolt"></i>
+                <span data-i18n="ai-btn-outline">Generate Presentation Outline</span>
+            </button>
+            <button onclick="aiSummarizeSlide()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-medium flex items-center space-x-1">
+                <i class="fa-solid fa-align-left"></i>
+                <span data-i18n="ai-btn-summarize">Summarize Slide</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Workspace (Sidebar Thumbnails + Slide Canvas Editor) -->
+    <main class="flex-1 flex overflow-hidden relative">
+
+        <!-- Left Sidebar: Slide Thumbnails -->
+        <aside class="w-48 sm:w-56 bg-slate-200/60 dark:bg-slate-800/80 border-r border-slate-300 dark:border-slate-700 flex flex-col select-none">
+            <div class="p-2 border-b border-slate-300 dark:border-slate-700 flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300" data-i18n="lbl-slides">SLIDES</span>
+                <button onclick="addNewSlide()" class="p-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs flex items-center space-x-1 px-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span data-i18n="btn-add">Add</span>
+                </button>
+            </div>
+
+            <!-- Thumbnail List -->
+            <div id="thumbnail-container" class="flex-1 overflow-y-auto p-2 space-y-2">
+                <!-- Dynamically Populated Thumbnails -->
+            </div>
+        </aside>
+
+        <!-- Center Workspace: Interactive Canvas Area -->
+        <section class="flex-1 canvas-container flex flex-col items-center justify-center p-4 overflow-auto relative">
+            
+            <!-- Canvas Frame Box -->
+            <div id="slide-wrapper" class="relative transition-all duration-300">
+                <div id="slide-canvas" class="slide-canvas bg-white relative overflow-hidden rounded shadow-2xl transition-all" style="width: 800px; height: 450px;">
+                    <!-- Slide Elements Rendered Here -->
+                </div>
+            </div>
+
+            <!-- Speaker Notes Expandable Tray at Bottom -->
+            <div class="absolute bottom-2 left-4 right-4 bg-white/95 dark:bg-slate-800/95 backdrop-blur border border-slate-300 dark:border-slate-700 rounded-lg p-2 shadow-lg max-w-2xl mx-auto">
+                <div class="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                    <span><i class="fa-regular fa-note-sticky mr-1"></i> <span data-i18n="lbl-speaker-notes">Speaker Notes</span></span>
+                    <button onclick="toggleSpeakerNotes()" class="hover:text-slate-800 dark:hover:text-slate-200"><i id="notes-toggle-icon" class="fa-solid fa-chevron-down"></i></button>
+                </div>
+                <textarea id="speaker-notes-input" oninput="updateSpeakerNotes(this.value)" placeholder="Type speaker notes here..." class="w-full h-12 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-1.5 outline-none resize-none text-slate-700 dark:text-slate-200"></textarea>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Status Bar -->
+    <footer class="bg-slate-800 text-slate-300 text-xs px-4 py-1 flex items-center justify-between border-t border-slate-700 select-none">
+        <div class="flex items-center space-x-4">
+            <span id="status-slide-counter">Slide 1 of 1</span>
+            <span class="text-slate-500">|</span>
+            <span id="status-theme">Theme: Modern Minimal</span>
+            <span class="text-slate-500">|</span>
+            <span class="text-amber-300" data-i18n="hint-edit"><i class="fa-solid fa-pen"></i> Double-click any text to edit it</span>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <!-- Zoom Controls -->
+            <div class="flex items-center space-x-1">
+                <button onclick="adjustZoom(-0.1)" class="px-1 hover:text-white"><i class="fa-solid fa-minus text-[10px]"></i></button>
+                <span id="zoom-percentage" class="text-[11px] w-10 text-center">100%</span>
+                <button onclick="adjustZoom(0.1)" class="px-1 hover:text-white"><i class="fa-solid fa-plus text-[10px]"></i></button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Fullscreen Presentation Overlay -->
+    <div id="presentation-overlay" class="fixed inset-0 bg-black hidden z-50 flex flex-col justify-between select-none">
+        <!-- Overlay Canvas Presentation Slide View -->
+        <div class="flex-1 flex items-center justify-center relative overflow-hidden">
+            <div id="presentation-slide-box" class="relative bg-white shadow-2xl transition-all">
+                <!-- Presentation Rendered Here -->
+            </div>
+
+            <!-- Ink Drawing Canvas Overlay -->
+            <canvas id="ink-canvas" class="absolute inset-0 pointer-events-none z-10"></canvas>
+            
+            <!-- Laser Pointer Blob -->
+            <div id="laser-pointer" class="w-4 h-4 bg-red-500 rounded-full fixed pointer-events-none shadow-[0_0_12px_#ef4444] hidden z-20 transform -translate-x-1/2 -translate-y-1/2"></div>
+        </div>
+
+        <!-- Presentation Floating Toolbar (Bottom Controls) -->
+        <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white px-4 py-2 rounded-full flex items-center space-x-4 border border-slate-700 shadow-2xl z-30 opacity-20 hover:opacity-100 transition-opacity duration-200">
+            <button onclick="prevSlide()" class="hover:text-blue-400 p-1"><i class="fa-solid fa-chevron-left"></i></button>
+            <span id="present-slide-num" class="text-xs font-mono">1 / 1</span>
+            <button onclick="nextSlide()" class="hover:text-blue-400 p-1"><i class="fa-solid fa-chevron-right"></i></button>
+            <div class="h-4 w-px bg-slate-700"></div>
+            <!-- Tools -->
+            <button onclick="toggleLaserPointer()" id="btn-laser" class="p-1 hover:text-red-400" title="Laser Pointer"><i class="fa-solid fa-arrow-pointer"></i></button>
+            <button onclick="toggleInkMode()" id="btn-ink" class="p-1 hover:text-amber-400" title="Draw Ink"><i class="fa-solid fa-pen"></i></button>
+            <button onclick="clearInk()" class="p-1 hover:text-slate-400" title="Clear Ink"><i class="fa-solid fa-eraser"></i></button>
+            <div class="h-4 w-px bg-slate-700"></div>
+            <button onclick="exitPresentation()" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-0.5 rounded text-xs"><i class="fa-solid fa-xmark mr-1"></i><span data-i18n="btn-exit">Exit</span></button>
+        </div>
+    </div>
+
+    <!-- Application Script Engine -->
+    <script>
+        /* Multi-Language Dictionary Engine (10 Languages) */
+        const translations = {
+            en: {
+                "btn-present": "Present", "btn-save": "Save", "tab-file": "File", "tab-home": "Home",
+                "tab-insert": "Insert", "tab-design": "Design", "tab-transitions": "Transitions",
+                "tab-animations": "Animations", "tab-ai": "AI Assistant", "lbl-new-slide": "New Slide",
+                "lbl-open": "Open JSON", "lbl-export-json": "Save JSON", "lbl-export-image": "Export Slide",
+                "lbl-templates": "Templates", "tmpl-pitch": "Pitch Deck", "tmpl-business": "Business",
+                "tmpl-edu": "Education", "lbl-text": "Text Box", "lbl-shapes": "Shapes", "lbl-image": "Image",
+                "lbl-table": "Table", "lbl-chart": "Chart", "lbl-themes": "Slide Themes", "lbl-aspect-ratio": "Ratio",
+                "lbl-slide-transition": "Slide Transition:", "btn-preview": "Preview", "lbl-element-anim": "Animation:",
+                "ai-btn-outline": "Generate Outline", "ai-btn-summarize": "Summarize Slide", "lbl-slides": "SLIDES",
+                "btn-add": "Add", "lbl-speaker-notes": "Speaker Notes", "btn-exit": "Exit",
+                "hint-edit": "Double-click any text to edit it"
+            },
+            es: {
+                "btn-present": "Presentar", "btn-save": "Guardar", "tab-file": "Archivo", "tab-home": "Inicio",
+                "tab-insert": "Insertar", "tab-design": "Diseño", "tab-transitions": "Transiciones",
+                "tab-animations": "Animaciones", "tab-ai": "Asistente IA", "lbl-new-slide": "Nueva Diapositiva",
+                "lbl-open": "Abrir JSON", "lbl-export-json": "Guardar JSON", "lbl-export-image": "Exportar Diapositiva",
+                "lbl-templates": "Plantillas", "tmpl-pitch": "Pitch Deck", "tmpl-business": "Negocios",
+                "tmpl-edu": "Educación", "lbl-text": "Cuadro Texto", "lbl-shapes": "Formas", "lbl-image": "Imagen",
+                "lbl-table": "Tabla", "lbl-chart": "Gráfico", "lbl-themes": "Temas de Diapositiva", "lbl-aspect-ratio": "Proporción",
+                "lbl-slide-transition": "Transición de Diapositiva:", "btn-preview": "Vista Previa", "lbl-element-anim": "Animación:",
+                "ai-btn-outline": "Generar Esquema", "ai-btn-summarize": "Resumir Diapositiva", "lbl-slides": "DIAPOSITIVAS",
+                "btn-add": "Añadir", "lbl-speaker-notes": "Notas del Orador", "btn-exit": "Salir",
+                "hint-edit": "Doble clic en cualquier texto para editarlo"
+            },
+            pt: {
+                "btn-present": "Apresentar", "btn-save": "Salvar", "tab-file": "Arquivo", "tab-home": "Início",
+                "tab-insert": "Inserir", "tab-design": "Design", "tab-transitions": "Transições",
+                "tab-animations": "Animações", "tab-ai": "Assistente IA", "lbl-new-slide": "Novo Slide",
+                "lbl-open": "Abrir JSON", "lbl-export-json": "Salvar JSON", "lbl-export-image": "Exportar Slide",
+                "lbl-templates": "Modelos", "tmpl-pitch": "Pitch Deck", "tmpl-business": "Negócios",
+                "tmpl-edu": "Educação", "lbl-text": "Caixa Texto", "lbl-shapes": "Formas", "lbl-image": "Imagem",
+                "lbl-table": "Tabela", "lbl-chart": "Gráfico", "lbl-themes": "Temas do Slide", "lbl-aspect-ratio": "Proporção",
+                "lbl-slide-transition": "Transição do Slide:", "btn-preview": "Visualizar", "lbl-element-anim": "Animação:",
+                "ai-btn-outline": "Gerar Esboço", "ai-btn-summarize": "Resumir Slide", "lbl-slides": "SLIDES",
+                "btn-add": "Adicionar", "lbl-speaker-notes": "Notas do Orador", "btn-exit": "Sair"
+            },
+            fr: {
+                "btn-present": "Présenter", "btn-save": "Enregistrer", "tab-file": "Fichier", "tab-home": "Accueil",
+                "tab-insert": "Insérer", "tab-design": "Conception", "tab-transitions": "Transitions",
+                "tab-animations": "Animations", "tab-ai": "Assistant IA", "lbl-new-slide": "Nouvelle Diapo",
+                "lbl-open": "Ouvrir JSON", "lbl-export-json": "Sauver JSON", "lbl-export-image": "Exporter Diapo",
+                "lbl-templates": "Modèles", "tmpl-pitch": "Pitch Deck", "tmpl-business": "Affaires",
+                "tmpl-edu": "Éducation", "lbl-text": "Zone Texte", "lbl-shapes": "Formes", "lbl-image": "Image",
+                "lbl-table": "Tableau", "lbl-chart": "Graphique", "lbl-themes": "Thèmes", "lbl-aspect-ratio": "Ratio",
+                "lbl-slide-transition": "Transition:", "btn-preview": "Aperçu", "lbl-element-anim": "Animation:",
+                "ai-btn-outline": "Générer Plan", "ai-btn-summarize": "Rsumer Diapo", "lbl-slides": "DIAPOSITIVES",
+                "btn-add": "Ajouter", "lbl-speaker-notes": "Notes du Présentateur", "btn-exit": "Quitter"
+            },
+            de: {
+                "btn-present": "Präsentieren", "btn-save": "Speichern", "tab-file": "Datei", "tab-home": "Start",
+                "tab-insert": "Einfügen", "tab-design": "Entwurf", "tab-transitions": "Übergänge",
+                "tab-animations": "Animationen", "tab-ai": "KI-Assistent", "lbl-new-slide": "Neue Folie",
+                "lbl-open": "JSON Öffnen", "lbl-export-json": "JSON Speichern", "lbl-export-image": "Folie Exportieren",
+                "lbl-templates": "Vorlagen", "tmpl-pitch": "Pitch Deck", "tmpl-business": "Business",
+                "tmpl-edu": "Bildung", "lbl-text": "Textfeld", "lbl-shapes": "Formen", "lbl-image": "Bild",
+                "lbl-table": "Tabelle", "lbl-chart": "Diagramm", "lbl-themes": "Folienthemen", "lbl-aspect-ratio": "Verhältnis",
+                "lbl-slide-transition": "Folienübergang:", "btn-preview": "Vorschau", "lbl-element-anim": "Animation:",
+                "ai-btn-outline": "Gliederung Erstellen", "ai-btn-summarize": "Folie Zusammenfassen", "lbl-slides": "FOLIEN",
+                "btn-add": "Hinzufügen", "lbl-speaker-notes": "Sprechernotizen", "btn-exit": "Beenden"
+            },
+            it: {
+                "btn-present": "Presenta", "btn-save": "Salva", "tab-file": "File", "tab-home": "Home",
+                "tab-insert": "Inserisci", "tab-design": "Progetto", "tab-transitions": "Transizioni",
+                "tab-animations": "Animazioni", "tab-ai": "Assistente IA", "lbl-new-slide": "Nuova Diapositiva",
+                "lbl-open": "Apri JSON", "lbl-export-json": "Salva JSON", "lbl-export-image": "Esporta Diapositiva",
+                "lbl-templates": "Modelli", "tmpl-pitch": "Pitch Deck", "tmpl-business": "Business",
+                "tmpl-edu": "Istruzione", "lbl-text": "Testo", "lbl-shapes": "Forme", "lbl-image": "Immagine",
+                "lbl-table": "Tabella", "lbl-chart": "Grafico", "lbl-themes": "Temi Diapositiva", "lbl-aspect-ratio": "Proporzione",
+                "lbl-slide-transition": "Transizione Diapositiva:", "btn-preview": "Anteprima", "lbl-element-anim": "Animazione:",
+                "ai-btn-outline": "Genera Struttura", "ai-btn-summarize": "Riassumi Diapositiva", "lbl-slides": "DIAPOSITIVE",
+                "btn-add": "Aggiungi", "lbl-speaker-notes": "Note Relatore", "btn-exit": "Esci"
+            },
+            ja: {
+                "btn-present": "再生", "btn-save": "保存", "tab-file": "ファイル", "tab-home": "ホーム",
+                "tab-insert": "挿入", "tab-design": "デザイン", "tab-transitions": "画面切り替え",
+                "tab-animations": "アニメーション", "tab-ai": "AIアシスタント", "lbl-new-slide": "新しいスライド",
+                "lbl-open": "JSONを開く", "lbl-export-json": "JSON保存", "lbl-export-image": "スライド出力",
+                "lbl-templates": "テンプレート", "tmpl-pitch": "ピッチデッキ", "tmpl-business": "ビジネス",
+                "tmpl-edu": "教育", "lbl-text": "テキストボックス", "lbl-shapes": "図形", "lbl-image": "画像",
+                "lbl-table": "表", "lbl-chart": "グラフ", "lbl-themes": "スライドテーマ", "lbl-aspect-ratio": "比率",
+                "lbl-slide-transition": "画面切り替え効果:", "btn-preview": "プレビュー", "lbl-element-anim": "アニメーション:",
+                "ai-btn-outline": "アウトライン生成", "ai-btn-summarize": "スライド要約", "lbl-slides": "スライド",
+                "btn-add": "追加", "lbl-speaker-notes": "発表者ノート", "btn-exit": "終了"
+            },
+            ko: {
+                "btn-present": "슬라이드 쇼", "btn-save": "저장", "tab-file": "파일", "tab-home": "홈",
+                "tab-insert": "삽입", "tab-design": "디자인", "tab-transitions": "전환",
+                "tab-animations": "애니메이션", "tab-ai": "AI 도구", "lbl-new-slide": "새 슬라이드",
+                "lbl-open": "JSON 열기", "lbl-export-json": "JSON 저장", "lbl-export-image": "슬라이드 내보내기",
+                "lbl-templates": "템플릿", "tmpl-pitch": "피치 덱", "tmpl-business": "비즈니스",
+                "tmpl-edu": "교육", "lbl-text": "텍스트 상자", "lbl-shapes": "도형", "lbl-image": "이미지",
+                "lbl-table": "표", "lbl-chart": "차트", "lbl-themes": "슬라이드 테마", "lbl-aspect-ratio": "비율",
+                "lbl-slide-transition": "슬라이드 전환:", "btn-preview": "미리보기", "lbl-element-anim": "애니메이션:",
+                "ai-btn-outline": "개요 생성", "ai-btn-summarize": "슬라이드 요약", "lbl-slides": "슬라이드 목록",
+                "btn-add": "추가", "lbl-speaker-notes": "발표자 노트", "btn-exit": "나가기"
+            },
+            ru: {
+                "btn-present": "Показ", "btn-save": "Сохранить", "tab-file": "Файл", "tab-home": "Главная",
+                "tab-insert": "Вставка", "tab-design": "Дизайн", "tab-transitions": "Переходы",
+                "tab-animations": "Анимация", "tab-ai": "ИИ Помощник", "lbl-new-slide": "Новый слайд",
+                "lbl-open": "Открыть JSON", "lbl-export-json": "Сохранить JSON", "lbl-export-image": "Экспорт слайда",
+                "lbl-templates": "Шаблоны", "tmpl-pitch": "Питч-дека", "tmpl-business": "Бизнес",
+                "tmpl-edu": "Образование", "lbl-text": "Текст", "lbl-shapes": "Фигуры", "lbl-image": "Рисунок",
+                "lbl-table": "Таблица", "lbl-chart": "Диаграмма", "lbl-themes": "Темы слайдов", "lbl-aspect-ratio": "Формат",
+                "lbl-slide-transition": "Переход слайда:", "btn-preview": "Просмотр", "lbl-element-anim": "Анимация:",
+                "ai-btn-outline": "Создать план", "ai-btn-summarize": "Сделать резюме", "lbl-slides": "СЛАЙДЫ",
+                "btn-add": "Создать", "lbl-speaker-notes": "Заметки докладчика", "btn-exit": "Выход"
+            },
+            zh: {
+                "btn-present": "放映", "btn-save": "保存", "tab-file": "文件", "tab-home": "开始",
+                "tab-insert": "插入", "tab-design": "设计", "tab-transitions": "切换",
+                "tab-animations": "动画", "tab-ai": "AI 助手", "lbl-new-slide": "新建幻灯片",
+                "lbl-open": "打开 JSON", "lbl-export-json": "保存 JSON", "lbl-export-image": "导出幻灯片",
+                "lbl-templates": "模板", "tmpl-pitch": "商业演示", "tmpl-business": "商务",
+                "tmpl-edu": "教育", "lbl-text": "文本框", "lbl-shapes": "形状", "lbl-image": "图片",
+                "lbl-table": "表格", "lbl-chart": "图表", "lbl-themes": "幻灯片主题", "lbl-aspect-ratio": "比例",
+                "lbl-slide-transition": "幻灯片切换:", "btn-preview": "预览", "lbl-element-anim": "动画效果:",
+                "ai-btn-outline": "生成大纲", "ai-btn-summarize": "总结幻灯片", "lbl-slides": "幻灯片",
+                "btn-add": "添加", "lbl-speaker-notes": "演讲者备注", "btn-exit": "退出"
+            }
+        };
+
+        /* State Management */
+        let currentLang = 'en';
+        let zoomLevel = 1.0;
+        let activeSlideIndex = 0;
+        let selectedElementId = null;
+        let isPresenting = false;
+        let isInkDrawing = false;
+        let isLaserActive = false;
+
+        // Core Document Data Structure
+        let presentation = {
+            title: "KitPoint Presentation",
+            aspectRatio: "16:9",
+            theme: "modern",
+            slides: [
+                {
+                    id: "slide_1",
+                    transition: "trans-fade",
+                    notes: "Welcome to KitPoint presentation!",
+                    elements: [
+                        {
+                            id: "el_1",
+                            type: "text",
+                            content: "Welcome to KitPoint",
+                            left: 100, top: 120, width: 600, height: 80,
+                            fontFamily: "Inter", fontSize: "48px", bold: true, color: "#1e293b", textAlign: "center",
+                            animation: "anim-fade-in"
+                        },
+                        {
+                            id: "el_2",
+                            type: "text",
+                            content: "Interactive Single-File Web Presentation Suite",
+                            left: 150, top: 220, width: 500, height: 50,
+                            fontFamily: "Inter", fontSize: "20px", color: "#64748b", textAlign: "center"
+                        }
+                    ]
+                }
+            ]
+        };
+
+        /* Initialization */
+        window.onload = function() {
+            renderThumbnails();
+            renderActiveSlide();
+            setupCanvasDragAndDrop();
+        };
+
+        /* Language Switcher */
+        function changeLanguage(lang) {
+            currentLang = lang;
+            const dict = translations[lang] || translations['en'];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (dict[key]) {
+                    el.innerText = dict[key];
+                }
+            });
+        }
+
+        /* Ribbon Tab Switcher */
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active-tab', 'border-blue-600', 'text-blue-600', 'dark:text-blue-400');
+                btn.classList.add('text-slate-600', 'dark:text-slate-300');
+            });
+            const activeBtn = document.getElementById(`tab-${tabName}`);
+            if (activeBtn) {
+                activeBtn.classList.add('active-tab', 'border-blue-600', 'text-blue-600', 'dark:text-blue-400');
+            }
+
+            document.querySelectorAll('.ribbon-panel').forEach(panel => panel.classList.add('hidden'));
+            const panel = document.getElementById(`ribbon-${tabName}`);
+            if (panel) panel.classList.remove('hidden');
+        }
+
+        /* UI Dark/Light Theme */
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+
+        /* Slide Management */
+        function addNewSlide() {
+            const newSlide = {
+                id: "slide_" + Date.now(),
+                transition: "none",
+                notes: "",
+                elements: [
+                    {
+                        id: "el_" + Date.now(),
+                        type: "text",
+                        content: "Click to add title",
+                        left: 100, top: 100, width: 600, height: 60,
+                        fontFamily: "Inter", fontSize: "36px", bold: true, color: "#1e293b", textAlign: "left"
+                    }
+                ]
+            };
+            presentation.slides.push(newSlide);
+            activeSlideIndex = presentation.slides.length - 1;
+            renderThumbnails();
+            renderActiveSlide();
+        }
+
+        function selectSlide(index) {
+            activeSlideIndex = index;
+            selectedElementId = null;
+            renderThumbnails();
+            renderActiveSlide();
+        }
+
+        function deleteSlide(index, event) {
+            if (event) event.stopPropagation();
+            if (presentation.slides.length <= 1) return;
+            presentation.slides.splice(index, 1);
+            if (activeSlideIndex >= presentation.slides.length) {
+                activeSlideIndex = presentation.slides.length - 1;
+            }
+            renderThumbnails();
+            renderActiveSlide();
+        }
+
+        /* Render Thumbnail Panel */
+        function renderThumbnails() {
+            const container = document.getElementById('thumbnail-container');
+            container.innerHTML = '';
+
+            presentation.slides.forEach((slide, idx) => {
+                const isActive = idx === activeSlideIndex;
+                const thumb = document.createElement('div');
+                thumb.className = `relative p-2 rounded cursor-pointer transition border-2 ${isActive ? 'bg-blue-50 dark:bg-slate-700 border-blue-600' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 hover:border-slate-400'}`;
+                thumb.onclick = () => selectSlide(idx);
+
+                thumb.innerHTML = `
+                    <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 mb-1">
+                        <span>${idx + 1}</span>
+                        ${presentation.slides.length > 1 ? `<button onclick="deleteSlide(${idx}, event)" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    </div>
+                    <div class="w-full bg-slate-100 dark:bg-slate-900 border rounded flex items-center justify-center overflow-hidden" style="height: 70px;">
+                        <span class="text-[9px] text-slate-400 truncate px-1">${slide.elements[0]?.content || 'Slide ' + (idx + 1)}</span>
+                    </div>
+                `;
+                container.appendChild(thumb);
+            });
+
+            document.getElementById('status-slide-counter').innerText = `Slide ${activeSlideIndex + 1} of ${presentation.slides.length}`;
+        }
+
+        /* Render Main Editable Canvas */
+        function renderActiveSlide() {
+            const slide = presentation.slides[activeSlideIndex];
+            const canvas = document.getElementById('slide-canvas');
+            canvas.innerHTML = '';
+            canvas.className = `slide-canvas bg-white relative overflow-hidden rounded shadow-2xl transition-all ${slide.transition || ''}`;
+
+            // Load Speaker Notes
+            document.getElementById('speaker-notes-input').value = slide.notes || '';
+
+            // Render Elements
+            slide.elements.forEach(el => {
+                const node = document.createElement('div');
+                node.id = el.id;
+                node.style.position = 'absolute';
+                node.style.left = el.left + 'px';
+                node.style.top = el.top + 'px';
+                node.style.width = el.width + 'px';
+                node.style.height = el.height + 'px';
+
+                if (selectedElementId === el.id) {
+                    node.classList.add('element-selected');
+                }
+
+                if (el.animation) {
+                    node.classList.add(el.animation);
+                }
+
+                // Render Content by Type
+                if (el.type === 'text') {
+                    node.classList.add('text-el');
+                    node.style.fontFamily = el.fontFamily || 'Inter';
+                    node.style.fontSize = el.fontSize || '24px';
+                    node.style.fontWeight = el.bold ? 'bold' : 'normal';
+                    node.style.fontStyle = el.italic ? 'italic' : 'normal';
+                    node.style.textDecoration = el.underline ? 'underline' : 'none';
+                    node.style.color = el.color || '#1e293b';
+                    node.style.textAlign = el.textAlign || 'left';
+                    node.style.outline = 'none';
+                    node.innerText = el.content;
+                    enableInlineEdit(node, node, (txt) => { el.content = txt; });
+                } else if (el.type === 'shape') {
+                    node.style.backgroundColor = el.backgroundColor || '#3b82f6';
+                    if (el.shapeKind === 'circle') node.style.borderRadius = '50%';
+                    if (el.shapeKind === 'triangle') {
+                        node.style.backgroundColor = 'transparent';
+                        node.style.width = '0';
+                        node.style.height = '0';
+                        node.style.borderLeft = `${el.width/2}px solid transparent`;
+                        node.style.borderRight = `${el.width/2}px solid transparent`;
+                        node.style.borderBottom = `${el.height}px solid ${el.backgroundColor || '#3b82f6'}`;
+                    }
+                } else if (el.type === 'image') {
+                    node.innerHTML = `<img src="${el.src}" class="w-full h-full object-cover rounded pointer-events-none" />`;
+                } else if (el.type === 'table') {
+                    node.innerHTML = tableHTML(el, true);
+                    node.querySelectorAll('[data-r]').forEach(td => {
+                        enableInlineEdit(td, node, (txt) => { el.rows[+td.dataset.r][+td.dataset.c] = txt; });
+                    });
+                } else if (el.type === 'chart') {
+                    node.innerHTML = chartHTML(el, true);
+                    node.querySelectorAll('[data-f]').forEach(t => {
+                        enableInlineEdit(t, node, (txt) => {
+                            if (t.dataset.f === 'title') el.title = txt; else el.labels[+t.dataset.f] = txt;
+                        });
+                    });
+                }
+
+                // Element Select Event
+                node.onclick = (e) => {
+                    e.stopPropagation();
+                    selectElement(el.id);
+                };
+
+                // Attach Dragging
+                makeElementDraggable(node, el);
+
+                canvas.appendChild(node);
+            });
+        }
+
+        /* Selección ligera (sin re-render) */
+        function selectElement(id) {
+            selectedElementId = id;
+            document.querySelectorAll('#slide-canvas > .element-selected').forEach(n => n.classList.remove('element-selected'));
+            if (id) { const n = document.getElementById(id); if (n) n.classList.add('element-selected'); }
+        }
+
+        /* Edición de texto en línea: doble clic para editar, Esc o clic fuera para terminar */
+        function enableInlineEdit(target, owner, onCommit) {
+            target.ondblclick = (e) => {
+                e.stopPropagation();
+                if (owner.id) selectElement(owner.id);
+                target.contentEditable = 'true';
+                target.classList.add('editing-text');
+                target.focus();
+                const range = document.createRange();
+                range.selectNodeContents(target);
+                range.collapse(false);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            };
+            target.oninput = () => { onCommit(target.innerText); renderThumbnails(); };
+            target.onkeydown = (e) => {
+                e.stopPropagation();
+                if (e.key === 'Escape') target.blur();
+            };
+            target.onblur = () => {
+                target.contentEditable = 'false';
+                target.classList.remove('editing-text');
+                onCommit(target.innerText);
+                renderThumbnails();
+            };
+        }
+
+        function tableHTML(el, editable) {
+            if (!el.rows) el.rows = [["Col 1", "Col 2"], ["Data 1", "Data 2"]];
+            const rows = el.rows.map((row, r) => `<tr class="${r === 0 ? 'bg-slate-200' : ''}">` +
+                row.map((cell, c) => `<td ${editable ? `data-r="${r}" data-c="${c}"` : ''} class="cell-edit border border-slate-300 p-1 ${r === 0 ? 'font-bold' : ''}" style="white-space:pre-wrap">${escapeHTML(cell)}</td>`).join('') + '</tr>').join('');
+            return `<table class="w-full h-full border-collapse border border-slate-300 text-xs text-center text-slate-800">${rows}</table>`;
+        }
+
+        function chartHTML(el, editable) {
+            if (!el.title) el.title = "Sample Chart Data";
+            if (!el.labels) el.labels = ["A", "B", "C"];
+            const heights = ['h-1/2', 'h-3/4', 'h-1/3'], colors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500'];
+            const bars = el.labels.map((l, i) => `<div class="w-1/3 h-full flex flex-col justify-end items-center">
+                <div class="${colors[i % 3]} ${heights[i % 3]} w-full rounded-t"></div>
+                <div ${editable ? `data-f="${i}"` : ''} class="cell-edit text-[10px] mt-1 text-slate-700">${escapeHTML(l)}</div></div>`).join('');
+            return `<div class="w-full h-full bg-slate-50 border border-slate-300 p-2 rounded flex flex-col">
+                <div ${editable ? 'data-f="title"' : ''} class="cell-edit text-[10px] font-bold text-center mb-2 text-slate-800">${escapeHTML(el.title)}</div>
+                <div class="flex items-stretch justify-around flex-1 space-x-2 px-2">${bars}</div></div>`;
+        }
+
+        function escapeHTML(t) {
+            return String(t == null ? '' : t).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+        }
+
+        /* Drag & Drop Canvas Elements */
+        function makeElementDraggable(element, elData) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            element.onmousedown = dragMouseDown;
+
+            function dragMouseDown(e) {
+                if (e.target.isContentEditable) return;
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+
+                elData.left = element.offsetLeft - pos1;
+                elData.top = element.offsetTop - pos2;
+                element.style.left = elData.left + "px";
+                element.style.top = elData.top + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        function setupCanvasDragAndDrop() {
+            document.getElementById('slide-canvas').onclick = () => {
+                if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
+                selectElement(null);
+            };
+            const titleInput = document.getElementById('presentation-title');
+            titleInput.oninput = () => { presentation.title = titleInput.value || 'KitPoint Presentation'; };
+        }
+
+        /* Element Inserters */
+        function addTextElement() {
+            const slide = presentation.slides[activeSlideIndex];
+            const newEl = {
+                id: "el_" + Date.now(),
+                type: "text",
+                content: "New Text Box",
+                left: 200, top: 180, width: 300, height: 50,
+                fontFamily: "Inter", fontSize: "24px", color: "#1e293b", textAlign: "left"
+            };
+            slide.elements.push(newEl);
+            selectedElementId = newEl.id;
+            renderActiveSlide();
+        }
+
+        function addShape(shapeKind) {
+            const slide = presentation.slides[activeSlideIndex];
+            const newEl = {
+                id: "el_" + Date.now(),
+                type: "shape",
+                shapeKind: shapeKind,
+                backgroundColor: "#3b82f6",
+                left: 250, top: 150, width: 120, height: 120
+            };
+            slide.elements.push(newEl);
+            selectedElementId = newEl.id;
+            renderActiveSlide();
+        }
+
+        function insertImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const slide = presentation.slides[activeSlideIndex];
+                const newEl = {
+                    id: "el_" + Date.now(),
+                    type: "image",
+                    src: e.target.result,
+                    left: 200, top: 100, width: 350, height: 220
+                };
+                slide.elements.push(newEl);
+                selectedElementId = newEl.id;
+                renderActiveSlide();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function insertTable() {
+            const slide = presentation.slides[activeSlideIndex];
+            const newEl = {
+                id: "el_" + Date.now(),
+                type: "table",
+                left: 200, top: 150, width: 300, height: 120
+            };
+            slide.elements.push(newEl);
+            selectedElementId = newEl.id;
+            renderActiveSlide();
+        }
+
+        function insertChart() {
+            const slide = presentation.slides[activeSlideIndex];
+            const newEl = {
+                id: "el_" + Date.now(),
+                type: "chart",
+                left: 200, top: 120, width: 320, height: 200
+            };
+            slide.elements.push(newEl);
+            selectedElementId = newEl.id;
+            renderActiveSlide();
+        }
+
+        /* Format & Style Helpers */
+        function applyTextStyle(styleProp, value) {
+            if (!selectedElementId) return;
+            const slide = presentation.slides[activeSlideIndex];
+            const el = slide.elements.find(e => e.id === selectedElementId);
+            if (el && el.type === 'text') {
+                el[styleProp] = value;
+                renderActiveSlide();
+            }
+        }
+
+        function toggleTextStyle(prop) {
+            if (!selectedElementId) return;
+            const slide = presentation.slides[activeSlideIndex];
+            const el = slide.elements.find(e => e.id === selectedElementId);
+            if (el && el.type === 'text') {
+                el[prop] = !el[prop];
+                renderActiveSlide();
+            }
+        }
+
+        function applyElementStyle(prop, value) {
+            if (!selectedElementId) return;
+            const slide = presentation.slides[activeSlideIndex];
+            const el = slide.elements.find(e => e.id === selectedElementId);
+            if (el) {
+                el[prop] = value;
+                renderActiveSlide();
+            }
+        }
+
+        function duplicateSelectedElement() {
+            if (!selectedElementId) return;
+            const slide = presentation.slides[activeSlideIndex];
+            const el = slide.elements.find(e => e.id === selectedElementId);
+            if (el) {
+                const clone = JSON.parse(JSON.stringify(el));
+                clone.id = "el_" + Date.now();
+                clone.left += 20;
+                clone.top += 20;
+                slide.elements.push(clone);
+                selectedElementId = clone.id;
+                renderActiveSlide();
+            }
+        }
+
+        function deleteSelectedElement() {
+            if (!selectedElementId) return;
+            const slide = presentation.slides[activeSlideIndex];
+            slide.elements = slide.elements.filter(e => e.id !== selectedElementId);
+            selectedElementId = null;
+            renderActiveSlide();
+        }
+
+        /* Themes & Transition Controls */
+        function applyTheme(themeName) {
+            presentation.theme = themeName;
+            document.getElementById('status-theme').innerText = `Theme: ${themeName.charAt(0).toUpperCase() + themeName.slice(1)}`;
+            renderActiveSlide();
+        }
+
+        function setSlideTransition(transName) {
+            presentation.slides[activeSlideIndex].transition = transName;
+        }
+
+        function previewTransition() {
+            renderActiveSlide();
+        }
+
+        function setElementAnimation(animName) {
+            if (!selectedElementId) return;
+            const slide = presentation.slides[activeSlideIndex];
+            const el = slide.elements.find(e => e.id === selectedElementId);
+            if (el) {
+                el.animation = animName;
+                renderActiveSlide();
+            }
+        }
+
+        function setAspectRatio(ratio) {
+            presentation.aspectRatio = ratio;
+            const canvas = document.getElementById('slide-canvas');
+            const b169 = document.getElementById('btn-ratio-169');
+            const b43 = document.getElementById('btn-ratio-43');
+
+            if (ratio === '16:9') {
+                canvas.style.width = '800px';
+                canvas.style.height = '450px';
+                b169.className = 'px-2 py-0.5 bg-blue-600 text-white rounded';
+                b43.className = 'px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded';
+            } else {
+                canvas.style.width = '700px';
+                canvas.style.height = '525px';
+                b43.className = 'px-2 py-0.5 bg-blue-600 text-white rounded';
+                b169.className = 'px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded';
+            }
+        }
+
+        function adjustZoom(delta) {
+            zoomLevel = Math.max(0.5, Math.min(1.5, zoomLevel + delta));
+            document.getElementById('slide-wrapper').style.transform = `scale(${zoomLevel})`;
+            document.getElementById('zoom-percentage').innerText = `${Math.round(zoomLevel * 100)}%`;
+        }
+
+        function updateSpeakerNotes(text) {
+            presentation.slides[activeSlideIndex].notes = text;
+        }
+
+        function toggleSpeakerNotes() {
+            const input = document.getElementById('speaker-notes-input');
+            const icon = document.getElementById('notes-toggle-icon');
+            if (input.classList.contains('hidden')) {
+                input.classList.remove('hidden');
+                icon.className = 'fa-solid fa-chevron-down';
+            } else {
+                input.classList.add('hidden');
+                icon.className = 'fa-solid fa-chevron-up';
+            }
+        }
+
+        /* AI Assistant Simulated Functions */
+        function aiGenerateOutline() {
+            presentation.slides = [
+                {
+                    id: "slide_ai_1",
+                    transition: "trans-fade",
+                    notes: "Introduction slide created by KitPoint AI",
+                    elements: [
+                        { id: "el_a1", type: "text", content: "AI Generated Deck: Executive Strategy", left: 80, top: 120, width: 640, height: 80, fontFamily: "Inter", fontSize: "36px", bold: true, color: "#1e293b", textAlign: "center" },
+                        { id: "el_a2", type: "text", content: "Prepared automatically by KitPoint AI Engine", left: 150, top: 220, width: 500, height: 40, fontFamily: "Inter", fontSize: "18px", color: "#3b82f6", textAlign: "center" }
+                    ]
+                },
+                {
+                    id: "slide_ai_2",
+                    transition: "trans-slide-left",
+                    notes: "Market Analysis outline",
+                    elements: [
+                        { id: "el_a3", type: "text", content: "Key Market Drivers", left: 80, top: 80, width: 640, height: 50, fontFamily: "Inter", fontSize: "30px", bold: true, color: "#0f172a" },
+                        { id: "el_a4", type: "text", content: "1. Rapid adoption of digital presentation tools\n2. Demand for real-time collaboration\n3. Integrated generative workflows", left: 80, top: 160, width: 600, height: 180, fontFamily: "Inter", fontSize: "20px", color: "#475569" }
+                    ]
+                }
+            ];
+            activeSlideIndex = 0;
+            renderThumbnails();
+            renderActiveSlide();
+        }
+
+        function aiSummarizeSlide() {
+            const currentSlide = presentation.slides[activeSlideIndex];
+            const textContents = currentSlide.elements.filter(e => e.type === 'text').map(e => e.content).join(' ');
+            currentSlide.notes = `AI Summary: ${textContents.substring(0, 100)}...`;
+            document.getElementById('speaker-notes-input').value = currentSlide.notes;
+        }
+
+        /* Preset Templates */
+        function loadTemplate(type) {
+            if (type === 'pitch') {
+                presentation.slides = [
+                    {
+                        id: "p1",
+                        transition: "trans-fade",
+                        elements: [
+                            { id: "pe1", type: "text", content: "PITCH DECK 2026", left: 100, top: 140, width: 600, height: 60, fontFamily: "Poppins", fontSize: "42px", bold: true, color: "#2563eb", textAlign: "center" },
+                            { id: "pe2", type: "text", content: "Revolutionizing Presentation Productivity", left: 150, top: 220, width: 500, height: 40, fontFamily: "Inter", fontSize: "18px", color: "#64748b", textAlign: "center" }
+                        ]
+                    }
+                ];
+            } else if (type === 'business') {
+                presentation.slides = [
+                    {
+                        id: "b1",
+                        transition: "trans-slide-right",
+                        elements: [
+                            { id: "be1", type: "text", content: "Quarterly Performance Review", left: 80, top: 100, width: 640, height: 60, fontFamily: "Merriweather", fontSize: "36px", bold: true, color: "#0f172a" },
+                            { id: "be2", type: "chart", left: 240, top: 180, width: 320, height: 200 }
+                        ]
+                    }
+                ];
+            } else if (type === 'education') {
+                presentation.slides = [
+                    {
+                        id: "e1",
+                        transition: "trans-zoom",
+                        elements: [
+                            { id: "ee1", type: "text", content: "Lesson 1: Modern Digital Science", left: 80, top: 80, width: 640, height: 60, fontFamily: "Inter", fontSize: "36px", bold: true, color: "#059669" },
+                            { id: "ee2", type: "text", content: "• Fundamentals\n• Applied Research\n• Practical Experiments", left: 100, top: 180, width: 500, height: 150, fontFamily: "Inter", fontSize: "22px", color: "#334155" }
+                        ]
+                    }
+                ];
+            }
+            activeSlideIndex = 0;
+            renderThumbnails();
+            renderActiveSlide();
+        }
+
+        /* Presentation Mode */
+        function startPresentation() {
+            isPresenting = true;
+            document.getElementById('presentation-overlay').classList.remove('hidden');
+            renderPresentationSlide();
+
+            // Keyboard Nav
+            document.addEventListener('keydown', handlePresentationKeys);
+        }
+
+        function exitPresentation() {
+            isPresenting = false;
+            document.getElementById('presentation-overlay').classList.add('hidden');
+            document.removeEventListener('keydown', handlePresentationKeys);
+        }
+
+        function renderPresentationSlide() {
+            const slide = presentation.slides[activeSlideIndex];
+            const box = document.getElementById('presentation-slide-box');
+            box.style.width = presentation.aspectRatio === '16:9' ? '960px' : '800px';
+            box.style.height = presentation.aspectRatio === '16:9' ? '540px' : '600px';
+            box.innerHTML = '';
+            box.className = `relative bg-white shadow-2xl transition-all ${slide.transition || ''}`;
+
+            slide.elements.forEach(el => {
+                const node = document.createElement('div');
+                node.style.position = 'absolute';
+                node.style.left = (el.left * 1.2) + 'px';
+                node.style.top = (el.top * 1.2) + 'px';
+                node.style.width = (el.width * 1.2) + 'px';
+                node.style.height = (el.height * 1.2) + 'px';
+
+                if (el.animation) node.classList.add(el.animation);
+
+                if (el.type === 'text') {
+                    node.style.fontFamily = el.fontFamily || 'Inter';
+                    node.style.fontSize = (parseInt(el.fontSize || '24') * 1.2) + 'px';
+                    node.style.fontWeight = el.bold ? 'bold' : 'normal';
+                    node.style.fontStyle = el.italic ? 'italic' : 'normal';
+                    node.style.color = el.color || '#1e293b';
+                    node.style.textAlign = el.textAlign || 'left';
+                    node.style.whiteSpace = 'pre-wrap';
+                    node.innerText = el.content;
+                } else if (el.type === 'shape') {
+                    node.style.backgroundColor = el.backgroundColor || '#3b82f6';
+                    if (el.shapeKind === 'circle') node.style.borderRadius = '50%';
+                } else if (el.type === 'image') {
+                    node.innerHTML = `<img src="${el.src}" class="w-full h-full object-cover rounded" />`;
+                } else if (el.type === 'table') {
+                    node.innerHTML = tableHTML(el, false);
+                } else if (el.type === 'chart') {
+                    node.innerHTML = chartHTML(el, false);
+                }
+
+                box.appendChild(node);
+            });
+
+            document.getElementById('present-slide-num').innerText = `${activeSlideIndex + 1} / ${presentation.slides.length}`;
+        }
+
+        function nextSlide() {
+            if (activeSlideIndex < presentation.slides.length - 1) {
+                activeSlideIndex++;
+                renderPresentationSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (activeSlideIndex > 0) {
+                activeSlideIndex--;
+                renderPresentationSlide();
+            }
+        }
+
+        function handlePresentationKeys(e) {
+            if (!isPresenting) return;
+            if (e.key === 'ArrowRight' || e.key === 'Space') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+            if (e.key === 'Escape') exitPresentation();
+        }
+
+        /* Presenter Tools: Laser & Ink */
+        function toggleLaserPointer() {
+            isLaserActive = !isLaserActive;
+            const laser = document.getElementById('laser-pointer');
+            const overlay = document.getElementById('presentation-overlay');
+
+            if (isLaserActive) {
+                laser.classList.remove('hidden');
+                overlay.onmousemove = (e) => {
+                    laser.style.left = e.clientX + 'px';
+                    laser.style.top = e.clientY + 'px';
+                };
+            } else {
+                laser.classList.add('hidden');
+                overlay.onmousemove = null;
+            }
+        }
+
+        function toggleInkMode() {
+            isInkDrawing = !isInkDrawing;
+            const inkCanvas = document.getElementById('ink-canvas');
+
+            if (isInkDrawing) {
+                inkCanvas.classList.remove('pointer-events-none');
+                inkCanvas.width = window.innerWidth;
+                inkCanvas.height = window.innerHeight;
+                const ctx = inkCanvas.getContext('2d');
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 4;
+
+                let drawing = false;
+                inkCanvas.onmousedown = (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(e.clientX, e.clientY); };
+                inkCanvas.onmousemove = (e) => { if (drawing) { ctx.lineTo(e.clientX, e.clientY); ctx.stroke(); } };
+                inkCanvas.onmouseup = () => { drawing = false; };
+            } else {
+                inkCanvas.classList.add('pointer-events-none');
+            }
+        }
+
+        function clearInk() {
+            const inkCanvas = document.getElementById('ink-canvas');
+            const ctx = inkCanvas.getContext('2d');
+            ctx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+        }
+
+        /* Save & Load JSON Data */
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(presentation, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", `${presentation.title.toLowerCase().replace(/\s+/g, '_')}.json`);
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    presentation = JSON.parse(e.target.result);
+                    activeSlideIndex = 0;
+                    renderThumbnails();
+                    renderActiveSlide();
+                } catch (err) {
+                    alert('Invalid JSON presentation file.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        /* Export Slide as Image (PNG) */
+        function exportPNG() {
+            const canvasEl = document.getElementById('slide-canvas');
+            html2canvas(canvasEl).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `slide_${activeSlideIndex + 1}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        }
+    </script>
+</body>
+</html>
